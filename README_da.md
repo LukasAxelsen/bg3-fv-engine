@@ -128,9 +128,7 @@ Løkken (CEGAR-stil, Clarke et al. 2000) itererer indtil den formelle model og s
 
 ## Pålidelighed
 
-En bedømmers første spørgsmål: *"Hvordan adskiller dette sig fra en testpakke?"*
-
-**Kort svar**: enhver `theorem` i dette repository er et bevisterm typetjekket af Lean 4-kernen — inklusive dem der bruger `native_decide`. Forskellen fra test er, at `native_decide` er **udtømmende modeltjek over endelige domæner** (certificeret af kernen), ikke stikprøvetagning.
+Enhver `theorem` i dette repository er et bevisterm typetjekket af Lean 4-kernen — inklusive dem der bruger `native_decide`. Forskellen fra test er, at `native_decide` er **udtømmende modeltjek over endelige domæner** (certificeret af kernen), ikke stikprøvetagning.
 
 ### Trusted Computing Base (TCB)
 
