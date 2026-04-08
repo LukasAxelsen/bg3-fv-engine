@@ -180,8 +180,7 @@ def crawl_all(db_path: Path | None = None, dry_run: bool = False) -> list[CrawlR
     Returns the list of ``CrawlRecord``s for inspection / testing.
     """
     client = _make_client()
-    db = None if dry_run else SpellDB(db_path or SpellDB._conn)
-
+    db: SpellDB | None = None
     if not dry_run:
         db = SpellDB(db_path) if db_path else SpellDB()
 
