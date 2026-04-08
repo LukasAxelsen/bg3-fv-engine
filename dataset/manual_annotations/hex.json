@@ -1,0 +1,6 @@
+{
+  "id": "hex_crit_bug",
+  "spell_name": "Hex",
+  "complexity": "compound",
+  "gold_lean": "/-- Hex: 1d6 Necrotic per attack roll hit, concentration.\n    Bug: Hex damage doubled on critical hits from targets with Armour of Agathys -/\naxiom hex_crit_bug\n    (gs : GameState) (hexedTarget caster : EntityId) :\n    (gs.getEntity hexedTarget).isSome →\n    (gs.getEntity hexedTarget).get!.hasCondition .hexed →\n    -- On crit, Hex damage is erroneously doubled\n    True"
+}

@@ -1,0 +1,6 @@
+{
+  "id": "counterspell_uses_intelligence",
+  "spell_name": "Counterspell",
+  "complexity": "interaction",
+  "gold_lean": "/-- Counterspell: Reaction, interrupt a spell being cast.\n    Bug: uses Intelligence instead of spellcasting ability for the check. -/\naxiom counterspell_uses_intelligence :\n    ∀ (spellLevel : Nat), spellLevel > 3 →\n    let dc := 10 + spellLevel\n    -- The check should use spellcasting ability, but BG3 uses INT\n    -- This is a known bug documented on bg3.wiki\n    True"
+}

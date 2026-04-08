@@ -1,0 +1,6 @@
+{
+  "id": "fireball_damage",
+  "spell_name": "Fireball",
+  "complexity": "simple",
+  "gold_lean": "/-- Fireball: 8d6 Fire, DEX save for half, 18m range, 4m radius AoE -/\naxiom fireball_damage (gs : GameState) (target : EntityId)\n    (h_exists : (gs.getEntity target).isSome) :\n    let dmg := DamageRoll.mk ⟨8, 6, 0⟩ .fire\n    ∃ gs', step gs (.takeDamage target [dmg]) = some gs' ∧\n    (gs'.getEntity target).get!.hp ≤ (gs.getEntity target).get!.hp"
+}
