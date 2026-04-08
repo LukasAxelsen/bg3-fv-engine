@@ -128,9 +128,7 @@ The loop (CEGAR-style, Clarke et al. 2000) iterates until the formal model and g
 
 ## Soundness
 
-A reviewer's first question: *"How is this different from a test suite?"*
-
-**Short answer**: every `theorem` in this repository is a proof term type-checked by the Lean 4 kernel — including those using `native_decide`. The distinction from testing is that `native_decide` is **exhaustive finite-domain model checking** (certified by the kernel), not sampling.
+Every `theorem` in this repository is a proof term type-checked by the Lean 4 kernel — including those using `native_decide`. The distinction from testing is that `native_decide` is **exhaustive finite-domain model checking** (certified by the kernel), not sampling.
 
 ### Trusted Computing Base (TCB)
 
