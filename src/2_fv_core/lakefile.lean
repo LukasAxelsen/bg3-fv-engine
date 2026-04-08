@@ -57,3 +57,6 @@ lean_lib Axioms where
 
 lean_lib Proofs where
   srcDir := "Proofs"
+
+lean_lib Scenarios where
+  srcDir := "Scenarios"

@@ -85,11 +85,13 @@ VALOR currently formalizes five research problems, each chosen for its capacity 
 
 BG3's damage pipeline classifies bonus damage into three tiers:
 
-| Tier | Abbreviation | Behavior |
-|------|-------------|----------|
-| Damage Source | DS | Direct damage (weapon hit, spell) |
-| Damage Rider | DR | Bonus that "rides" on a source (Hex, coatings) |
-| DRS | DRS | Rider **treated as** a new source, causing all riders to reapply |
+
+| Tier          | Abbreviation | Behavior                                                         |
+| ------------- | ------------ | ---------------------------------------------------------------- |
+| Damage Source | DS           | Direct damage (weapon hit, spell)                                |
+| Damage Rider  | DR           | Bonus that "rides" on a source (Hex, coatings)                   |
+| DRS           | DRS          | Rider **treated as** a new source, causing all riders to reapply |
+
 
 With *k* DRS effects and *m* riders, total damage scales as *O((k+1) × m)*.  A single thrown-weapon attack with Lightning Jabber + Hex + Lightning Charges + Ring of Flinging + Tavern Brawler deals ~36 average damage (with DRS) vs. ~24 (without)—a 50% amplification from a single hidden mechanic.  Extreme combinations exceed 1,000 damage per attack.
 
@@ -182,12 +184,14 @@ bg3-fv-engine/
 
 ## Prerequisites
 
-| Tool | Version | Purpose |
-|------|---------|---------|
-| Python | ≥ 3.11 | Crawler, bridge, eval scripts |
-| [elan](https://github.com/leanprover/elan) + Lean 4 | ≥ 4.3.0 | Formal verification core |
-| [BG3 Script Extender](https://github.com/Norbyte/bg3se) | ≥ v18 | In-game oracle (optional for offline verification) |
-| Baldur's Gate 3 | Patch 7+ | Runtime oracle (optional) |
+
+| Tool                                                    | Version  | Purpose                                            |
+| ------------------------------------------------------- | -------- | -------------------------------------------------- |
+| Python                                                  | ≥ 3.11   | Crawler, bridge, eval scripts                      |
+| [elan](https://github.com/leanprover/elan) + Lean 4     | ≥ 4.3.0  | Formal verification core                           |
+| [BG3 Script Extender](https://github.com/Norbyte/bg3se) | ≥ v18    | In-game oracle (optional for offline verification) |
+| Baldur's Gate 3                                         | Patch 7+ | Runtime oracle (optional)                          |
+
 
 The Lean 4 and in-game components are **optional**.  The crawler, parser, database, and Python tests work standalone.
 
@@ -242,6 +246,7 @@ crawler.save_raw_dumps(records)
 ```
 
 You can verify any entry against the wiki:
+
 ```bash
 python3 -c "
 import importlib, json
@@ -254,6 +259,7 @@ db.close()
 ```
 
 Expected output (all values from bg3.wiki, zero fabrication):
+
 ```json
 {
   "name": "Fireball",
@@ -416,11 +422,13 @@ python3 -m pytest tests/ --cov=src --cov-report=term-missing
 
 #### What the tests cover
 
-| File | Tests | What is verified |
-|------|-------|-----------------|
-| `test_wikitext_parser.py` | 8 | Parsing of real `{{Feature page}}` templates from bg3.wiki for Fireball, Hex, Haste, Eldritch Blast, Counterspell; edge cases (missing template, unknown school, bad dice) |
-| `test_database.py` | 7 | SQLite upsert/read, duplicate UID update, UNIQUE(name) conflict, queries by level / bugs / concentration / reaction |
-| `test_models.py` | 7 | `DiceExpression.parse` variants, `Spell` validation (empty name rejection, level bounds), `DamageType` enum completeness, `School` enum roundtrip |
+
+| File                      | Tests | What is verified                                                                                                                                                           |
+| ------------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `test_wikitext_parser.py` | 8     | Parsing of real `{{Feature page}}` templates from bg3.wiki for Fireball, Hex, Haste, Eldritch Blast, Counterspell; edge cases (missing template, unknown school, bad dice) |
+| `test_database.py`        | 7     | SQLite upsert/read, duplicate UID update, UNIQUE(name) conflict, queries by level / bugs / concentration / reaction                                                        |
+| `test_models.py`          | 7     | `DiceExpression.parse` variants, `Spell` validation (empty name rejection, level bounds), `DamageType` enum completeness, `School` enum roundtrip                          |
+
 
 ### Integration test: live wiki
 
@@ -477,6 +485,7 @@ if errors:
 ```
 
 Common issues:
+
 - **Spell not found**: Check the exact page title on bg3.wiki (case-sensitive).
 - **Missing UID**: Some wiki pages use non-standard templates.  The parser logs a warning.
 - **Bad dice notation**: The regex expects `NdM` or `NdM+B`.  Compound expressions like `1d8+1d4` need the parser extended.
@@ -538,27 +547,23 @@ print(open(out).read())
 ### Adding a new spell
 
 1. **Crawl it**:
-   ```bash
+  ```bash
    python3 -c "
    import importlib
    crawler = importlib.import_module('src.1_auto_formalizer.crawler')
    crawler.main()
    " --spell "Your Spell Name"
-   ```
-
+  ```
 2. **Add its axiom** to `src/2_fv_core/Axioms/BG3Rules.lean`:
-   ```lean
+  ```lean
    axiom your_spell_damage (gs : GameState) (target : EntityId)
        (h_exists : (gs.getEntity target).isSome) :
        let dmg := DamageRoll.mk ⟨dice_count, dice_sides, bonus⟩ .damage_type
        ∃ gs', step gs (.takeDamage target [dmg]) = some gs' ∧
        (gs'.getEntity target).get!.hp ≤ (gs.getEntity target).get!.hp
-   ```
-
+  ```
 3. **Add a counterexample search** to `src/2_fv_core/Proofs/Exploits.lean` if the spell has interesting interactions.
-
 4. **Add its UID** to `src/3_engine_bridge/lua_generator.py` → `SPELL_UID_MAP`.
-
 5. **Add a benchmark annotation** to `dataset/manual_annotations/your_spell.json`.
 
 ### Adding a new research problem
