@@ -1,33 +1,56 @@
 # VALOR `v0.1-alpha`
 
-> ⚠️ **Denne danske udgave svarer til et tidligere `v0.1-alpha`-udkast og er arkiveret.**
-> Det aktuelle, reviderede verifikationsomfang står i den
-> [engelske README](README.md).  Den danske oversættelse opdateres
-> kun ved eksplicit anmodning.
+[![CI](https://github.com/LukasAxelsen/bg3-fv-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/LukasAxelsen/bg3-fv-engine/actions)
+[![Lean 4](https://img.shields.io/badge/Lean-4.29.1-blueviolet)](https://leanprover.github.io)
 
 **Verified Automated Loop for Oracle-driven Rule-checking**
+(Verificeret, automatiseret løkke til orakel-drevet regelkontrol)
 
 [English](README.md) | [中文](README_zh.md) | [Dansk](README_da.md)
 
-Formel verifikation af Baldur's Gate 3-kampmekanikker i Lean 4. 27 selvstændige scenarier, der hver koder en reel spilmekanik som en afgørbar proposition og beviser (eller modbeviser) den via Lean 4-kernen.
+> Denne danske udgave er synkroniseret med [den engelske README](README.md) op til `v0.1-alpha`.
+> Projektpolitik: den engelske udgave er den primære; den kinesiske og danske
+> udgave opdateres kun ved eksplicit anmodning.
 
-Inspireret af [sts_lean](https://github.com/collinzrj/sts_lean). Hvor det projekt beviser uendelige kombinationer i Slay the Spire, beviser VALOR skadesgrænser, ressourceinvarianter, termineringsgarantier og optimale strategier i BG3.
+En neuro-symbolsk lukket-løkke-ramme til formel verifikation af kampmekanikker i computerspil, instantieret på Baldur's Gate 3.  `v0.1-alpha` leverer:
 
-## Hurtig start
+- **en verificeret Lean 4-kerne** (`lake build` er grøn — nul `error`, nul advarsler, nul `sorry` i standard­målet);
+- **en Python-datapipeline** der crawler [bg3.wiki](https://bg3.wiki) ind i en typestærk lokal database (55 enhedstests);
+- **en Lean ↔ Lua-bro** der oversætter Lean-modeksempler til testscripts som kan køre i spillet;
+- **et oracle i spillet** udformet som en BG3 Script Extender-mod;
+- **ét fuldt mekaniseret forskningsscenarie** (P14, advantage/disadvantage-algebra) med en ikke-triviel åben-vs-lukket algebraisk indsigt: `combine` er kommutativ, men **ikke** associativ — modbevist i Lean.
+
+Yderligere 26 scenarie­udkast (P6–P13, P15–P32) findes under `Scenarios_wip/` og er sporet som v0.2-arbejde.  Se afsnittet [`v0.1`-omfang](#v01-omfang) nedenfor for en eksplicit, maskinkontrollerbar liste over hver eneste påstand.
+
+Arkitekturen er inspireret af [`sts_lean`](https://github.com/collinzrj/sts_lean) (verifikation af uendelige kombinationer i Slay the Spire) og af CEGAR-mønstret (Clarke et al., 2000), tilpasset et spil med dybere og rigere regelflader.
+
+---
+
+## Hurtig start (verificerer hele projektet på <60 s)
 
 ```bash
-git clone https://github.com/LukasAxelsen/bg3-fv-engine.git && cd bg3-fv-engine
-python3 -m pip install -r requirements.txt   # crawler + tests
-python3 -m pytest tests/ -v                  # 23 tests, <1s
+git clone https://github.com/LukasAxelsen/bg3-fv-engine.git
+cd bg3-fv-engine
 
-# Lean 4-verifikation (kræver elan: https://github.com/leanprover/elan)
-cd src/2_fv_core && lake build               # typetjekker alle 27 scenarier
+# Python-side: 55 enhedstests af data- og brolagene.
+python3 -m pip install -r requirements.txt
+python3 -m pytest tests/ -q                # ⇒ 55 passed in 0.04s
+
+# Lean-side: bevisførers verifikation af kernen.
+# Kræver elan: https://github.com/leanprover/elan
+cd src/2_fv_core
+lake update                                # engangs, genererer lake-manifest.json
+lake build                                 # ⇒ Build completed successfully (8 jobs).
 ```
+
+Hvis begge kommandoer rapporterer succes, er hver eneste påstand i [`v0.1`-omfang](#v01-omfang)-afsnittet nedenfor nu maskinkontrolleret på din maskine.
+
+---
 
 ## Arkitektur
 
 ```
- Wiki-tekst ──crawler.py──▶ SQLite DB ──llm_to_lean.py──▶ Lean 4-aksiomer
+ wiki-tekst ──crawler.py──▶ SQLite-DB ──llm_to_lean.py──▶ Lean 4-aksiomer
                                                               │
        ┌──────────────────────────────────────────────────────┘
        ▼
@@ -37,214 +60,169 @@ cd src/2_fv_core && lake build               # typetjekker alle 27 scenarier
  lua_generator.py ──▶ BG3 Script Extender-mod ──▶ kamplog
        │
        ▼
- log_analyzer.py ──▶ afvigelsesrapport ──▶ LLM-korrektion ──▶ gentag
+ log_analyzer.py ──▶ divergens­rapport ──▶ LLM-korrektion ──▶ ny runde
 ```
 
-Løkken (CEGAR-stil, Clarke et al. 2000) itererer indtil den formelle model og spilmotoren er enige. Lean-scenarierne nedenfor fungerer selvstændigt — ingen LLM eller spil påkrævet.
+Den CEGAR-agtige løkke itererer indtil den formelle model og spillets motor stemmer overens.  Lean-kernen i `v0.1-alpha` kører ende-til-ende uden hverken LLM eller et kørende spil; LLM- og oracle-trinnene er til stede som funktionsdygtige stubbe og som integrationspunkter for v0.2.
 
 ---
 
-## Hvad vi beviser
+## `v0.1`-omfang
 
-27 scenarier fordelt på 7 beviskategorier. Alle sætninger markeret med ✓ er maskintjekket af Lean 4-kernen (se [Pålidelighed](#pålidelighed) for hvad dette indebærer). Åbne problemer er markeret med `sorry`.
+Dette er den udtømmende, maskinkontrollerbare liste over hvad `lake build` beviser i denne udgivelse.  Ingen påstand uden for denne tabel er erklæret verificeret.
 
-### I. Terminering og velfunderethed
+### Fundament (`Core/`, `Axioms/`, `Proofs/`)
 
-*Kæder af udløste spileffekter standser altid.*
+| Fil                        | Sætning / definition                | Hvad den siger                                                                            | Taktik                     |
+| -------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------- | -------------------------- |
+| `Core/Types.lean`          | `Entity`, `GameState`, `Event`, …   | Typeret ontologi for BG3-kamp (entiteter, skade, tilstande, handlinger).                   | (definitioner, derivede).  |
+| `Core/Engine.lean`         | `step : GameState → Event → Option` | Total small-step-overgangsfunktion; ikke-rekursiv efter at `stepEndTurn` er trukket ud.    | (definitioner).            |
+| `Axioms/BG3Rules.lean`     | `drs_damage_scaling`                | DRS-skadesformlen kommuterer: `(n+1)·r + b = b + r·(n+1)` over `Int`.                      | `Int.mul_comm`             |
+| `Axioms/BG3Rules.lean`     | `reaction_chain_bounded`            | At markere en entitet som "har reageret" forøger strengt `reactionsUsed`.                  | `simp`                     |
+| `Axioms/BG3Rules.lean`     | `action_economy_bounded`            | `∀ flags, maxAttacksPerTurn flags ≤ 8` (universelt).                                        | `cases × 6`                |
+| `Axioms/BG3Rules.lean`     | `overwrite_replaces`                | Efter `addCondition` med `Overwrite` er der ≤ 1 tilstand med samme tag.                    | `simp`                     |
+| `Axioms/BG3Rules.lean`     | `ignore_preserves_existing`         | `addCondition` med `Ignore` er identitet, når tag'et allerede er til stede.                 | `simp`                     |
+| `Proofs/Exploits.lean`     | `drs_amplifies_damage`              | Det konkrete DRS-exploitscenarie giver strengt mere skade end sin variant uden DRS.        | `native_decide`            |
+| `Proofs/Exploits.lean`     | `reaction_chain_terminates`         | Når en entitet har reageret, kan den ikke længere reagere.                                  | `native_decide`            |
+| `Proofs/Exploits.lean`     | `max_attacks_is_8`                  | All-feature-build'en rammer præcis den analytiske 8-angrebs grænse.                         | `native_decide`            |
+| `Proofs/Exploits.lean`     | `max_attacks_honour_is_7`           | Samme build er begrænset til 7 i Honour Mode.                                               | `native_decide`            |
+| `Proofs/Termination.lean`  | `reaction_decreases_fuel`           | Det velfunderede mål `entities.length - reactionsUsed.length` aftager strengt.              | `simp` + `omega`           |
+| `Proofs/Termination.lean`  | `max_chain_length`                  | Initialt brændstof er lig med `entities.length`.                                            | `simp`                     |
+| `Proofs/Termination.lean`  | `pass_turn_always_valid`            | `step gs (.passTurn e)` er `some _` så længe `e` findes i `gs` (liveness, universelt).      | `cases` på `getEntity`     |
+| `Proofs/Termination.lean`  | `tick_preserves_length`             | End-of-turn tilstands­tikning forlænger aldrig tilstandslisten.                              | `List.length_filterMap_le` |
 
-| # | Scenarie | Nøglesætning | Metode |
-|---|----------|--------------|--------|
-| P2 | Reaktionskæde | `reaction_decreases_fuel` — kædelængde ≤ antal entiteter | velfunderet rekursion ✓ |
-| P6 | Agathys + Hellish Rebuke-kaskade | `cascade_always_terminates` — for ENHVER startskade | `simp` ✓ (universel) |
-| P9 | Overfladeelementinteraktioner | `rewriting_terminates` — ingen uendelig ild↔vand-løkke | termomskrivning ✓ |
-| P19 | Våd + Lyn | `wet_consumed_after_aoe` — Våd er en lineær ressource, forbruges ved brug | Lyapunov-funktion ✓ |
+### Scenarie P14 — Advantage/Disadvantage-algebra (`Scenarios/P14_*.lean`)
 
-### II. Ressourceinvarianter
+| Sætning                                    | Hvad den siger                                                                                                                          | Taktik                     |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| `combine_comm`                             | Den binære `combine` er kommutativ.                                                                                                      | `cases × 2; rfl`           |
+| `combine_normal_left/right`                | `normal` er tosidet identitet for `combine`.                                                                                             | `cases; rfl`               |
+| `adv_idempotent`, `disadv_idempotent`      | Idempotens af `advantage` og `disadvantage` under `combine`.                                                                             | `rfl`                      |
+| `adv_disadv_annihilate`                    | `combine advantage disadvantage = normal`.                                                                                              | `rfl`                      |
+| **`combine_not_assoc`**                    | **Modbevis.** `combine` er *ikke* associativ; eksplicit vidne `(disadv, adv, adv)`.                                                      | `simp` på vidnet           |
+| `classify_singleton`, `classify_pair`      | "Klassificér-så-resolv"-operatoren stemmer overens med `combine` på lister af længde ≤ 2.                                                  | `cases × n; native_decide` |
+| `adv_dc11`, `disadv_dc11`, `normal_dc11`   | Lukkede sandsynlighedsudtryk (×400 / ×20) for DC 11-tjek.                                                                                 | `native_decide`            |
+| **`advantage_ge_normal`**                  | **Universelt.** `∀ t ∈ [2..20], probAdvantage400 t ≥ probNormal20 t · 20`. Begrænset `Fin 19` afgøres af `decide` og løftes til `Nat`.    | `decide` + `omega`         |
+| `advantage_ge_normal_dc{11,15,20}`         | Konkrete vidner for det universelle udsagn ved DC-grænserne.                                                                              | `native_decide`            |
 
-*Spilressourcer overholder bevarelses-/monotonicitetsregler.*
+**Akademisk fund (P14):** filens tidligere udkast påstod `combine_assoc` og kaldte strukturen en *kommutativ idempotent monoid*.  Da beviset blev mekaniseret i Lean, dukkede et modeksempel op, så strukturen er nu klassificeret som en **kommutativ, ikke-associativ, annihilerende magma** — strengt svagere end Ginsbergs (1988) tre-elementbilattice langs associativitets­aksen.  Modbeviset er nu i sig selv en sætning (`combine_not_assoc`), og den ægte rækkefølge- og grupperingsuafhængige multi-kilde-operator er `classify`, ikke `resolve`.  Det er præcis denne form for korrektion som lukket-løkke formel verifikation skal bringe op til overfladen.
 
-| # | Scenarie | Nøglesætning | Resultat |
-|---|----------|--------------|----------|
-| P3 | Koncentration | `concentration_uniqueness` — højst én koncentrationsbesværgelse pr. entitet | aksiom |
-| P5 | Statusstabling | `ignore_preserves_existing` — Ignore StackType er idempotent | ✓ |
-| P7 | Multiklasse-besværgelsespladser | `esl_paladin5_sorc5 = 7` — præcis ESL for alle byggetyper | `native_decide` ✓ |
-| P15 | Sorcery Point-økonomi | `round_trip_always_lossy` — hver SP↔plads-cyklus taber ≥1 SP | `interval_cases` ✓ (universel) |
-| P29 | Coffeelock-udnyttelse | BG3: `two_cycles_capped` — begrænset til 4 ekstra pladser. 5e RAW: `ten_cycles_thirty_slots` — **ubegrænset** | ✓ / ✓ |
+### Hvad **ikke** er verificeret i `v0.1-alpha`
 
-### III. Skadesgrænser og præcis beregning
-
-*Præcise skadestal for specifikke builds, verificeret mod bg3.wiki.*
-
-| # | Scenarie | Nøglesætning | Resultat |
-|---|----------|--------------|----------|
-| P1 | DRS-sammensætning | `drs_amplifies_damage` — DRS forårsager O((k+1)×m)-skalering | `native_decide` ✓ |
-| P10 | DRS-skadesloft | `full_turn_damage` — maks. skade pr. tur for kastebygningen | `native_decide` ✓ |
-| P12 | Smite + kritisk træffer | `crit_max = 127`, `crit_preserves_flat` — terninger fordobles, modifikatorer ikke | `native_decide` ✓ |
-| P16 | Opcast-effektivitet | `two_base_beats_upcast` — 2× Fireball N3 > 1× Fireball N6 | `native_decide` ✓ |
-| P17 | Dobbeltført vs tohåndet | `no_gwm_crossover_at_6` — præcis STR-mod hvor DW overhaler TH | `omega` ✓ (universel) |
-
-### IV. Handlingsøkonomi-grænser
-
-*Maksimalt antal handlinger/angreb en karakter kan udføre pr. tur.*
-
-| # | Scenarie | Nøglesætning | Resultat |
-|---|----------|--------------|----------|
-| P4 | Handlingsøkonomi | `max_attacks_is_8`, `max_attacks_honour_is_7` | `native_decide` ✓ |
-| P22 | Action Surge + Haste + Tyv | `global_max_is_11` — udtømmende søgning over alle 192 builds | `native_decide` ✓ |
-
-### V. Sandsynlighed og stokastisk dominans
-
-*d20-fordelinger, Markov-kæder, ordensstatistik.*
-
-| # | Scenarie | Nøglesætning | Resultat |
-|---|----------|--------------|----------|
-| P8 | Koncentrationsredninger | `eb_dc_always_10` — Eldritch Blast DC bundlinjer ved 10 for alle d10-resultater | `omega` ✓ (universel) |
-| P14 | Fordels-algebra | `combine_comm`, `combine_assoc`, `adv_idempotent` — 3-element monoid-love | `cases` ✓ (universel) |
-| P18 | Karmiske terninger | `karmic_boost_over_standard` — træfrate stiger fra 50% til ~54,8% | Markov-kæde ✓ |
-| P21 | Dødsredninger | `survival_less_than_half` — P(overlev) ≈ 46,7%, ikke 50% | absorberende kæde ✓ |
-| P25 | Bardisk inspiration | `advantage_never_beats_d6_bi` — BI(d6) ≥ fordel for ALLE DC'er | udtømmende ✓ |
-| P28 | Initiativ-førsteslå | `alert_quadruples_first_strike` — Alert: 9% → 36% alle-først (2v2) | ordensstatistik ✓ |
-
-### VI. Spilteori og modstanderræsonnement
-
-*Optimalt spil i strategiske interaktioner mellem castere/kombattanter.*
-
-| # | Scenarie | Nøglesætning | Resultat |
-|---|----------|--------------|----------|
-| P11 | Counterspell-krig | `game_tree_finite` — dybde ≤ antal castere | `native_decide` ✓ |
-| P23 | Tvillinget Haste + koncentrationsbrud | `break_round_2 = 0` — modstanderens break-even ved runde 2 | `native_decide` ✓ |
-| P26 | Grapple/Shove-lås | `threshold_is_6` — +6 Atletik kræves for 50% 3-rundelås | `native_decide` ✓ |
-
-### VII. Kombinatorisk optimering
-
-*Build-valg, holdsammensætning, ressourceplanlægning — mange NP-hårde generelt, løst eksakt for BG3's små instansstørrelser.*
-
-| # | Scenarie | Nøglesætning | Resultat |
-|---|----------|--------------|----------|
-| P13 | Sneak Attack-berettigelse | `eligible_ratio = 832` — 832/2048 tilstande tillader SA (40,6%) | 2¹¹ optælling ✓ |
-| P20 | Holdsammensætning | `minimum_cover_size_is_3` — 3 klasser dækker alle 8 roller; 2 kan ikke | C(12,2) + C(12,3) ✓ |
-| P24 | Hvileplanlægning | `smart_beats_greedy6` — grådig kort hvile-placering er suboptimal | modeksempel ✓ |
-| P27 | Feat-valg | `greedy_suboptimal` — synergier gør grådig fejlagtig; GWM+PAM+Sentinel optimal | C(12,3) QUBO ✓ |
-| P30 | Wild Magic Surge | `positive_expected_value`, `high_variance` — netto +EV men σ ≫ μ | statistik ✓ |
-| P31 | Helbredelseseffektivitet | `healing_word_theorem` — HW > Cure Wounds for angribs-DPR ≥ 8 | `omega` ✓ (universel) |
-| P32 | Multiklasse-dip | `rogue_dip_improves_fighter` — rene builds er suboptimale | udtømmende IP ✓ |
+- De 26 scenarie­udkast `P6–P13, P15–P32` (nu under `Scenarios_wip/`).  De indeholder pladsholder­sætninger der er ældre end Lean 4.29's `List`-API-omdøbning og andre kerneændringer; mange bruger forældede taktikker eller postulerer numerisk forkerte værdier som `native_decide` afviser.  Hvert af dem er et v0.2-arbejdspunkt.
+- De seks regel-aksiomer i `Axioms/BG3Rules.lean` (`hellish_rebuke_trigger`, `concentration_uniqueness`, `haste_self_cast_bug`, `fireball_damage`, `counterspell_uses_intelligence`, `hex_crit_bug`).  Disse er **antagelser** om BG3's motor; verifikations­pipelinen er ansvarlig for dem, ikke kernen.  De optræder eksplicit via `#print axioms` i ethvert teorem der afhænger af dem.
 
 ---
 
-## Pålidelighed
+## Soundhed, TCB og kløften mellem model og spil
 
-Enhver `theorem` i dette repository er et bevisterm typetjekket af Lean 4-kernen — inklusive dem der bruger `native_decide`. Forskellen fra test er, at `native_decide` er **udtømmende modeltjek over endelige domæner** (certificeret af kernen), ikke stikprøvetagning.
+Hvert eneste `theorem` i standardmålet er et bevis­term der er typecheck'et af Lean 4-kernen.  `native_decide` er **udtømmende endelig-domæne modelkontrol** med et certifikat som kernen selv verificerer — ikke stikprøver.
 
-### Trusted Computing Base (TCB)
+**Trusted Computing Base.** Kør `#print axioms <theorem>` i en hvilken som helst fil for at opregne de aksiomer et bevis hviler på.  For den verificerede kerne er aksiomsættet:
 
-Alle beviser reducerer til Lean 4-kernen plus disse aksiomer (verificerbare via `#print axioms`):
+| Aksiom                                              | Kilde                  | Bemærkninger                                       |
+| --------------------------------------------------- | ---------------------- | -------------------------------------------------- |
+| `propext`                                           | Lean 4-kerne           | Propositionel ekstensionalitet                     |
+| `Quot.sound`                                        | Lean 4-kerne           | Kvotient-soundhed                                  |
+| `Classical.choice`                                  | Lean 4-kerne           | Bruges af `simp`/`decide`-infrastrukturen          |
+| `Lean.ofReduceBool`                                 | `native_decide`        | Stoler på kompileret reduktion; samme TCB som Mathlib |
+| (de seks BG3-aksiomer i `Axioms/BG3Rules.lean`)     | spilmotor-antagelse    | Vises eksplicit; tjekkes i oracle-trinnet          |
 
-| Aksiom | Kilde | Bemærkninger |
-|--------|-------|--------------|
-| `propext` | Lean 4-kerne | Propositionel ekstensionalitet |
-| `Quot.sound` | Lean 4-kerne | Kvotient-pålidelighed |
-| `Classical.choice` | Lean 4-kerne | Bruges af `simp`-taktik |
-| `Lean.ofReduceBool` | `native_decide` | Stoler på kompileret reduktion; samme TCB som mathlib |
-
-Ingen scenarier i `Scenarios/` introducerer brugerdefinerede `axiom`-deklarationer. Aksiomerne i `Axioms/BG3Rules.lean` (P1–P5) er isolerede formaliseringsmål til LLM-pipelinen og importeres **ikke** af nogen scenariefil.
-
-### Bevismetoder: hvad tæller som hvad
-
-| Teknik | Hvad den beviser | Eksempel |
-|--------|-----------------|----------|
-| `native_decide` over optalt domæne | **Udtømmende modeltjek**: alle tilstande tjekket, bevisattest genereret | P13: alle 2048 boolske tilstande |
-| `native_decide` på konkrete værdier | **Verificeret beregning**: specifik instans bekræftet | P12: `crit_max = 127` |
-| `omega`, `simp`, `cases` | **Strukturelt bevis**: gælder for ALLE input (universelt kvantificeret) | P6: `cascade_always_terminates` |
-| `sorry` | **Åbent problem**: formuleret men ikke bevist, tydeligt markeret | P7: `esl_le_total_level` |
-
-Konkret: 11 af 27 scenarier indeholder mindst én universelt kvantificeret sætning bevist med strukturelle taktikker (ikke `native_decide`). De resterende bruger udtømmende optælling over endelige domæner, hvilket er en standard verificeret modeltjek-teknik.
-
-### Modeltrofasthed
-
-Lean-modellen koder regler fra [bg3.wiki](https://bg3.wiki), ikke spilbinæren. Dette skaber et potentielt gab:
-
-| Lag | Hvad den stoler på | Hvordan gabet adresseres |
-|-----|--------------------|--------------------------|
-| Lean-model | bg3.wiki er korrekt | In-game-orakel validerer forudsigelser mod den rigtige spilmotor |
-| bg3.wiki | Fællesskabs-reverse engineering | Krydsrefereret med spilfiler; wiki'en har >10.000 redaktører |
-| In-game-orakel | BG3 Script Extender API | SE er standard modding-framework, bredt brugt af fællesskabet |
-
-CEGAR-løkken er designet til iterativt at lukke dette gab: når oraklet afviger fra modellen, fødes afvigelsen tilbage som en korrektion. Den aktuelle `v0.1-alpha` leverer Lean-verifikationslaget; orakel-integrationen er funktionel men kræver manuel spilinteraktion.
+**Kløften mellem model og spil.** Lean-modellen koder reglerne fra [bg3.wiki](https://bg3.wiki), som selv er en community-reverse-engineering af spilbinæren.  CEGAR-løkken er det mekanisme der lukker kløften: når oraklet i spillet observerer en divergens fra modellen, fødes divergensen ind i LLM-trinnet som en korrektion.  I `v0.1-alpha` kører løkken ende-til-ende på syntetiske logs (se `eval/run_feedback_loop.py`); i v0.2 kobles den på et kørende spil.
 
 ---
 
-## Sådan ser det ud i praksis
+## Selv­verifikation i spillet (P14)
 
-### 1. Verificering af sætninger (terminal)
+Scenariet `Scenarios/P14_AdvantageAlgebra.lean` beviser blandt andet:
 
-```
-$ cd src/2_fv_core && lake build
-Building Scenarios.P13_SneakAttackSAT
-Building Scenarios.P21_DeathSaveMarkov
-Building Scenarios.P29_CoffeelockInfiniteSlots
-...
-Build completed successfully.     # alle sætninger typetjekket
-```
+> `adv_dc11`: med advantage på et DC 11 d20-tjek er sandsynligheden for succes præcis `300/400 = 75 %`.
 
-### 2. In-game-verifikation (trin-for-trin)
-
-**Eksempel**: P12 hævder at en Paladin 6 / Sorcerer 6 med Greatsword, niveau 4 Divine Smite, kritisk træffer mod Undead giver maksimalt 127 skade.
+Sådan verificerer du dette empirisk inde i selve spillet:
 
 ```
-Trin 1.  Installér BG3 Script Extender (github.com/Norbyte/bg3se).
+Trin 1.  Installér BG3 Script Extender (https://github.com/Norbyte/bg3se).
 
-Trin 2.  Kopiér VALOR-modden til Script Extender-mappen:
-           cp src/4_ingame_oracle/Mods/VALOR_Injector/*.lua "<BG3_SE_Lua_Sti>/"
-         Tilføj til BootstrapServer.lua:
-           Ext.Require("main")
+Trin 2.  Kopier VALOR-mod'en til SE's Lua-bibliotek:
+           cp src/4_ingame_oracle/Mods/VALOR_Injector/*.lua "<BG3_SE_Lua_Dir>/"
+           mkdir -p "<BG3_SE_Lua_Dir>/VALOR_Scripts"
+           mkdir -p "<BG3_SE_Lua_Dir>/VALOR_Logs"
 
-Trin 3.  Start BG3. Indlæs et save. Åbn SE-konsollen (standard: F10).
-         Du bør se: "[VALOR] Session loaded, polling VALOR_Scripts/"
+         Platform­specifik <BG3_SE_Lua_Dir>:
+           Linux:    ~/.local/share/Larian Studios/Baldur's Gate 3/Script Extender/Lua/
+           Windows:  %LOCALAPPDATA%/Larian Studios/Baldur's Gate 3/Script Extender/Lua/
+           macOS:    ~/Library/Application Support/Larian Studios/Baldur's Gate 3/Script Extender/Lua/
 
-Trin 4.  Genskab scenariet manuelt:
-           a. Opret en Paladin 6 / Sorcerer 6-karakter (STR 20)
-           b. Udstyr et Greatsword
-           c. Find en Undead-fjende
-           d. Gem spillet
-           e. Angrib med Divine Smite (niveau 4-plads)
-           f. Ved kritisk træffer: notér skadevisningen
+Trin 3.  Start BG3, indlæs en hvilken som helst gem-fil, åbn SE-konsollen
+         (standardgenvej: F10).  Forventet output:
+           "[VALOR] Session loaded, polling VALOR_Scripts/"
 
-Trin 5.  Sammenlign:
-           Lean-forudsigelse: maks. 127 (4d6 våben + 12d8 smite + 7 fast)
-           Spilvisning: bør vise ≤ 127 total skade
+Trin 4.  Generér testskriptet for P14 (1000 forsøg ved DC 11, advantage):
+           python3 -m src.3_engine_bridge.lua_generator \
+             --scenario p14_adv_dc11 --trials 1000 \
+             --out "<BG3_SE_Lua_Dir>/VALOR_Scripts/p14.lua"
+
+Trin 5.  I spillet: indlæs en hvilken som helst kampencounter, så motoren
+         er "i live".  Mod'en opdager det nye script, kører det og skriver
+         en JSON-log:
+           "<BG3_SE_Lua_Dir>/VALOR_Logs/p14.json"
+
+Trin 6.  Sammenlign med teorien:
+           python3 -m src.3_engine_bridge.log_analyzer \
+             --scenario p14_adv_dc11 \
+             --log    "<BG3_SE_Lua_Dir>/VALOR_Logs/p14.json" \
+             --expect 0.75 --tolerance 0.04
+         Forventet output: "AGREE: observed 0.74 ± 0.014, theoretical 0.75".
 ```
+
+Hvis sammenligningen er uden for tolerancen, er det en *divergens*, og det er inputtet til næste CEGAR-runde.
 
 ---
 
-## Katalogstruktur
+## Repository-struktur
 
 ```
 src/
-  1_auto_formalizer/     Python: wiki-crawler, parser, SQLite DB, LLM-stub
+  1_auto_formalizer/     Python: wiki-crawler, parser, SQLite-DB, LLM-stub
   2_fv_core/
+    lean-toolchain       Pinnet: leanprover/lean4:v4.29.1
+    lakefile.lean        Build-manifest (standardmål = verificeret kerne)
     Core/                Lean 4 spil-ontologi + tilstandsmaskine
-    Axioms/              Formaliserede BG3-regler (P1–P5, isoleret)
-    Proofs/              Terminerings- og exploit-beviser
-    Scenarios/           Selvstændige scenarier P6–P32 (hovedbidrag)
-    lakefile.lean        Build-manifest
+    Axioms/              Formaliserede BG3-regler (P1–P5)
+    Proofs/              Termineringsbeviser + exploit-beviser
+    Scenarios/           v0.1 verificerede scenarier (P14)
+    Scenarios_wip/       v0.2-udkast (P6–P13, P15–P32; ikke i standardmålet)
   3_engine_bridge/       Python: Lean-output → Lua-scripts → loganalyse
   4_ingame_oracle/       Lua: BG3 Script Extender-mod
-eval/                    Feedback-løkke-orkestrator + metrikindsamling
-tests/                   23 pytest-tests (Python-lag)
-dataset/                 Rå wiki-dumps + manuelt annoterede benchmarks
+eval/                    Feedback-løkke-orkestrator + metrik-indsamling
+tests/                   55 pytest-tests (modeller, parser, DB, bro)
+dataset/                 Rå wiki-dumps + manuelle annoteringsbenchmarks
 ```
+
+## Tilføj et nyt scenarie
+
+Opret `src/2_fv_core/Scenarios/P33_YourProblem.lean`:
+
+```lean
+namespace VALOR.Scenarios.P33
+
+def myMechanic (x : Nat) : Nat := x * x
+
+theorem my_property : myMechanic 7 = 49 := by native_decide
+
+end VALOR.Scenarios.P33
+```
+
+Tilføj `` `Scenarios.P33_YourProblem `` til `roots`-listen i standardmålet `lean_lib VALOR` i `src/2_fv_core/lakefile.lean`, og kør derefter `lake build`.  Ingen andre filer skal ændres.
 
 ## Referencer
 
-- Clarke et al. (2000). Counterexample-Guided Abstraction Refinement. *CAV*.
-- de Moura & Ullrich (2021). The Lean 4 Theorem Prover. *CADE*.
-- [sts_lean](https://github.com/collinzrj/sts_lean) — Slay the Spire uendelig-combo-verifikation i Lean 4.
-- [bg3.wiki](https://bg3.wiki) — Fællesskabswiki, eneste datakilde.
+- Clarke, Grumberg, Jha, Lu & Veith (2000). *Counterexample-Guided Abstraction Refinement.* CAV.
+- de Moura & Ullrich (2021). *The Lean 4 Theorem Prover and Programming Language.* CADE.
+- Ginsberg (1988). *Multivalued Logics: A Uniform Approach to Inference in Artificial Intelligence.* Computational Intelligence.
+- [`sts_lean`](https://github.com/collinzrj/sts_lean) — Verifikation af uendelige kombinationer i Slay the Spire i Lean 4.
+- [bg3.wiki](https://bg3.wiki) — Community-wiki, eneste datakilde.
 
 ## Licens
 
 MIT
-
----
-
-*Dette dokument er den arkiverede danske oversættelse af `v0.1-alpha`. Den engelske README.md er den primært opdaterede version.*

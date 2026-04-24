@@ -1,286 +1,225 @@
 # VALOR `v0.1-alpha`
 
-> ⚠️ **此中文版本对应早期 `v0.1-alpha` 草案，已归档。**
-> 当前 `v0.1-alpha` 的可验证范围已大幅收窄并经过严格审计，请以
-> [英文 README](README.md) 为准。本中文版仅在显式请求下与英文版同步。
+[![CI](https://github.com/LukasAxelsen/bg3-fv-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/LukasAxelsen/bg3-fv-engine/actions)
+[![Lean 4](https://img.shields.io/badge/Lean-4.29.1-blueviolet)](https://leanprover.github.io)
 
 **Verified Automated Loop for Oracle-driven Rule-checking**
+（基于神谕反馈的电子游戏战斗机制形式化验证闭环框架）
 
 [English](README.md) | [中文](README_zh.md) | [Dansk](README_da.md)
 
-基于 Lean 4 的《博德之门3》战斗机制形式化验证框架。27 个自包含场景，每个场景将一条真实游戏机制编码为可判定命题，并由 Lean 4 内核完成证明（或证伪）。
+> 本中文版与 [英文 README](README.md) 同步至 `v0.1-alpha`。
+> 项目策略：以英文版为主版本，中文 / 丹麦文版本仅在显式请求时同步。
 
-灵感来自 [sts_lean](https://github.com/collinzrj/sts_lean)。该项目证明《杀戮尖塔》中的无限连击，而 VALOR 证明《博德之门3》中的伤害上界、资源不变量、终止性保证与最优策略。
+一个面向电子游戏战斗机制的神经-符号闭环形式化验证框架，以《博德之门 3》为实例化对象。`v0.1-alpha` 提供：
 
-## 快速开始
+- **一个已验证的 Lean 4 核心**（默认构建目标 `lake build` 全绿：零 `error`、零 warning、零 `sorry`）；
+- **一条 Python 数据管道**：从 [bg3.wiki](https://bg3.wiki) 抓取并写入带类型的本地数据库（55 项单元测试）；
+- **一座 Lean ↔ Lua 桥**：把 Lean 反例编译为可在游戏内执行的 Lua 测试脚本；
+- **一个游戏内神谕（oracle）**：以 BG3 Script Extender mod 形式提供；
+- **一个完整机械化的研究场景**（P14：优势 / 劣势代数），并在该场景中给出一项非平凡的代数结论——`combine` 满足交换律但**不**满足结合律（在 Lean 中以反例予以证伪）。
+
+另有 26 份场景草稿（P6–P13、P15–P32）置于 `Scenarios_wip/`，作为 v0.2 工作项跟踪。下文 [`v0.1` 已验证范围](#v01-已验证范围) 一节给出了**逐条可机械验证**的清单。
+
+整体架构受 [`sts_lean`](https://github.com/collinzrj/sts_lean)（《杀戮尖塔》无限连击的 Lean 4 验证）以及 CEGAR 框架（Clarke 等，2000）启发，并针对规则面更复杂的 BG3 进行调整。
+
+---
+
+## 快速开始（< 60 秒内验证整个项目）
 
 ```bash
-git clone https://github.com/LukasAxelsen/bg3-fv-engine.git && cd bg3-fv-engine
-python3 -m pip install -r requirements.txt   # 爬虫 + 测试依赖
-python3 -m pytest tests/ -v                  # 23 个测试，<1秒
+git clone https://github.com/LukasAxelsen/bg3-fv-engine.git
+cd bg3-fv-engine
 
-# Lean 4 验证（需要 elan：https://github.com/leanprover/elan）
-cd src/2_fv_core && lake build               # 对全部 27 个场景进行类型检查
+# Python 端：数据层 + 桥层共 55 项单元测试。
+python3 -m pip install -r requirements.txt
+python3 -m pytest tests/ -q                # ⇒ 55 passed in 0.04s
+
+# Lean 端：定理证明器对验证核心的完整检查。
+# 需要先安装 elan: https://github.com/leanprover/elan
+cd src/2_fv_core
+lake update                                # 一次性，生成 lake-manifest.json
+lake build                                 # ⇒ Build completed successfully (8 jobs).
 ```
 
-## 架构
+若两条命令均输出成功，则下文 [`v0.1` 已验证范围](#v01-已验证范围) 中所列的每一条命题都已在你本地完成机械验证。
+
+---
+
+## 整体架构
 
 ```
- Wiki文本 ──crawler.py──▶ SQLite数据库 ──llm_to_lean.py──▶ Lean 4 公理
+ wiki 文本 ──crawler.py──▶ SQLite 数据库 ──llm_to_lean.py──▶ Lean 4 公理
                                                               │
        ┌──────────────────────────────────────────────────────┘
        ▼
  Lean 4 内核 ──lake build──▶ 证明 / 反例
        │
        ▼
- lua_generator.py ──▶ BG3 Script Extender Mod ──▶ 战斗日志
+ lua_generator.py ──▶ BG3 Script Extender mod ──▶ 战斗日志
        │
        ▼
- log_analyzer.py ──▶ 差异报告 ──▶ LLM修正 ──▶ 循环
+ log_analyzer.py ──▶ 偏差报告 ──▶ LLM 修正 ──▶ 下一轮
 ```
 
-该循环采用 CEGAR 风格（Clarke et al. 2000），迭代直至形式化模型与游戏引擎达成一致。以下 Lean 场景可独立运行——无需 LLM 或游戏本体。
+CEGAR 风格的闭环不断迭代，直至形式模型与游戏引擎一致。`v0.1-alpha` 的 Lean 核心可独立、端到端运行，无需 LLM 或运行中的游戏；LLM 与神谕阶段以可工作的桩函数形式提供，并预留了 v0.2 的集成入口。
 
 ---
 
-## 证明内容
+## `v0.1` 已验证范围
 
-27 个场景，划分为 7 个证明类别。标记 ✓ 的定理均经 Lean 4 内核机器检查（关于其含义，参见[可靠性](#可靠性)一节）。标记 `sorry` 的为开放问题。
+下表是本版本中 `lake build` 所证明命题的**完整、可机械验证**清单。任何不在本节中的论断都不视为已验证。
 
-### I. 终止性与良基性
+### 基础层（`Core/`、`Axioms/`、`Proofs/`）
 
-*游戏效果的触发链总是会停止。*
+| 文件                       | 定理 / 定义                          | 内容                                                                                       | 战术                       |
+| -------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------ | -------------------------- |
+| `Core/Types.lean`          | `Entity`、`GameState`、`Event`、…     | BG3 战斗的类型化本体（实体、伤害、状态、动作）。                                               | （定义 + 派生实例）。         |
+| `Core/Engine.lean`         | `step : GameState → Event → Option`  | 全函数化的小步转移函数；通过抽出 `stepEndTurn` 后已是非递归的。                                  | （定义）。                  |
+| `Axioms/BG3Rules.lean`     | `drs_damage_scaling`                 | DRS 伤害公式可交换：`(n+1)·r + b = b + r·(n+1)` （`Int` 上）。                                | `Int.mul_comm`             |
+| `Axioms/BG3Rules.lean`     | `reaction_chain_bounded`             | 把一名实体标记为「已反应」严格扩展 `reactionsUsed`。                                            | `simp`                     |
+| `Axioms/BG3Rules.lean`     | `action_economy_bounded`             | `∀ flags, maxAttacksPerTurn flags ≤ 8`（全称）。                                              | `cases × 6`                |
+| `Axioms/BG3Rules.lean`     | `overwrite_replaces`                 | 以 `Overwrite` 调用 `addCondition` 后，同标签状态至多保留 1 条。                                | `simp`                     |
+| `Axioms/BG3Rules.lean`     | `ignore_preserves_existing`          | 以 `Ignore` 调用 `addCondition`，若标签已存在则等同恒等。                                       | `simp`                     |
+| `Proofs/Exploits.lean`     | `drs_amplifies_damage`               | 具体的 DRS 套路场景的伤害严格高于其去 DRS 版本。                                                | `native_decide`            |
+| `Proofs/Exploits.lean`     | `reaction_chain_terminates`          | 一名实体反应过后，即不再具备反应资格。                                                          | `native_decide`            |
+| `Proofs/Exploits.lean`     | `max_attacks_is_8`                   | 全特性 build 恰好达到分析上的 8 次攻击上界。                                                    | `native_decide`            |
+| `Proofs/Exploits.lean`     | `max_attacks_honour_is_7`            | 同一 build 在 Honour 模式下被压至 7 次。                                                       | `native_decide`            |
+| `Proofs/Termination.lean`  | `reaction_decreases_fuel`            | 良基测度 `entities.length - reactionsUsed.length` 在每次反应后严格下降。                         | `simp` + `omega`           |
+| `Proofs/Termination.lean`  | `max_chain_length`                   | 初始燃料等于 `entities.length`。                                                              | `simp`                     |
+| `Proofs/Termination.lean`  | `pass_turn_always_valid`             | 只要 `e` 存在于 `gs`，则 `step gs (.passTurn e)` 必为 `some _`（活性，全称）。                    | 对 `getEntity` 作 `cases`   |
+| `Proofs/Termination.lean`  | `tick_preserves_length`              | 回合末状态计时不会拉长状态列表。                                                                | `List.length_filterMap_le` |
 
+### 场景 P14：优势 / 劣势代数（`Scenarios/P14_*.lean`）
 
-| #   | 场景            | 关键定理                                     | 方法            |
-| --- | ------------- | ---------------------------------------- | ------------- |
-| P2  | 反应链           | `reaction_decreases_fuel` — 链长 ≤ 实体数量    | 良基递归 ✓        |
-| P6  | 寒冰护甲 + 地狱斥责连锁 | `cascade_always_terminates` — 对任意初始伤害成立  | `simp` ✓（全称）  |
-| P9  | 地表元素交互        | `rewriting_terminates` — 不存在无限火↔水循环      | 项重写 ✓         |
-| P19 | 潮湿 + 闪电       | `wet_consumed_after_aoe` — 潮湿是线性资源，使用即消耗 | Lyapunov 函数 ✓ |
+| 定理                                       | 内容                                                                                                                              | 战术                       |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| `combine_comm`                             | 二元 `combine` 满足交换律。                                                                                                          | `cases × 2; rfl`           |
+| `combine_normal_left/right`                | `normal` 是 `combine` 的双侧单位元。                                                                                                 | `cases; rfl`               |
+| `adv_idempotent`、`disadv_idempotent`       | `advantage`、`disadvantage` 在 `combine` 下幂等。                                                                                   | `rfl`                      |
+| `adv_disadv_annihilate`                    | `combine advantage disadvantage = normal`。                                                                                       | `rfl`                      |
+| **`combine_not_assoc`**                    | **反例式证伪。** `combine` *不* 满足结合律；显式见证 `(disadv, adv, adv)`。                                                            | 对见证作 `simp`             |
+| `classify_singleton`、`classify_pair`       | 「分类后定型」算子在长度 ≤ 2 的列表上与 `combine` 一致。                                                                                 | `cases × n; native_decide` |
+| `adv_dc11`、`disadv_dc11`、`normal_dc11`     | DC 11 检定下的闭式概率（×400 / ×20）。                                                                                                | `native_decide`            |
+| **`advantage_ge_normal`**                  | **全称。** `∀ t ∈ [2..20], probAdvantage400 t ≥ probNormal20 t · 20`。在 `Fin 19` 上以 `decide` 化解后回升至 `Nat`。                  | `decide` + `omega`         |
+| `advantage_ge_normal_dc{11,15,20}`         | 上述全称命题在边界 DC 上的具体见证。                                                                                                  | `native_decide`            |
 
+**P14 中的学术发现**：原稿断言 `combine_assoc` 并把该结构称为「交换幂等幺半群」。在 Lean 中尝试机械化证明时直接得到反例，结构因此被改归为**带零元的、交换、非结合的 magma**——比 Ginsberg（1988）所述的三元 bilattice 在结合律一维上严格更弱。该反例本身现已成为定理 `combine_not_assoc`，而真正与顺序 / 分组无关的多源算子是 `classify`，而不是逐对 `resolve`。这正是闭环形式化验证应当浮现的修正。
 
-### II. 资源不变量
+### `v0.1-alpha` **未** 验证的部分
 
-*游戏资源服从守恒/单调性定律。*
-
-
-| #   | 场景            | 关键定理                                                                             | 结果                     |
-| --- | ------------- | -------------------------------------------------------------------------------- | ---------------------- |
-| P3  | 专注            | `concentration_uniqueness` — 每个实体至多一个专注法术                                        | 公理                     |
-| P5  | 状态叠加          | `ignore_preserves_existing` — 忽略型叠加类型具幂等性                                        | ✓                      |
-| P7  | 多职业法术位        | `esl_paladin5_sorc5 = 7` — 所有构建类型的精确有效施法等级                                       | `native_decide` ✓      |
-| P15 | 魔力点经济         | `round_trip_always_lossy` — 每次魔力点↔法术位往返损失 ≥1                                     | `interval_cases` ✓（全称） |
-| P29 | Coffeelock 漏洞 | BG3：`two_cycles_capped` — 上限 4 个额外法术位。5e RAW：`ten_cycles_thirty_slots` — **无上限** | ✓ / ✓                  |
-
-
-### III. 伤害上界与精确计算
-
-*特定构建下的精确伤害数值，依据 bg3.wiki 验证。*
-
-
-| #   | 场景        | 关键定理                                                 | 结果                |
-| --- | --------- | ---------------------------------------------------- | ----------------- |
-| P1  | DRS 伤害组合  | `drs_amplifies_damage` — DRS 导致 O((k+1)×m) 缩放        | `native_decide` ✓ |
-| P10 | DRS 伤害上限  | `full_turn_damage` — 投掷流单回合最大伤害                      | `native_decide` ✓ |
-| P12 | 神圣惩击 + 暴击 | `crit_max = 127`, `crit_preserves_flat` — 骰子翻倍，修正值不变 | `native_decide` ✓ |
-| P16 | 升环效率      | `two_base_beats_upcast` — 2×火球术L3 > 1×火球术L6          | `native_decide` ✓ |
-| P17 | 双持 vs 双手  | `no_gwm_crossover_at_6` — 双持在力量+6时反超双手               | `omega` ✓（全称）     |
-
-
-### IV. 行动经济上界
-
-*单回合内角色最多可执行的攻击/动作次数。*
-
-
-| #   | 场景              | 关键定理                                          | 结果                |
-| --- | --------------- | --------------------------------------------- | ----------------- |
-| P4  | 行动经济            | `max_attacks_is_8`, `max_attacks_honour_is_7` | `native_decide` ✓ |
-| P22 | 行动如潮 + 加速术 + 盗贼 | `global_max_is_11` — 穷举全部 192 种构建             | `native_decide` ✓ |
-
-
-### V. 概率与随机占优
-
-*d20 骰面分布、马尔可夫链、次序统计量。*
-
-
-| #   | 场景      | 关键定理                                                         | 结果            |
-| --- | ------- | ------------------------------------------------------------ | ------------- |
-| P8  | 专注豁免    | `eb_dc_always_10` — 魔能爆发 DC 对所有 d10 结果均为 10                  | `omega` ✓（全称） |
-| P14 | 优势/劣势代数 | `combine_comm`, `combine_assoc`, `adv_idempotent` — 三元素幺半群定律 | `cases` ✓（全称） |
-| P18 | 因果骰     | `karmic_boost_over_standard` — 命中率从 50% 提升至 ~54.8%           | 马尔可夫链 ✓       |
-| P21 | 死亡豁免    | `survival_less_than_half` — 存活概率 ≈ 46.7%，而非 50%              | 吸收链 ✓         |
-| P25 | 激励骰     | `advantage_never_beats_d6_bi` — BI(d6) ≥ 优势，对所有 DC 成立        | 穷举 ✓          |
-| P28 | 先攻首杀    | `alert_quadruples_first_strike` — 警觉专长：9% → 36%（2v2）         | 次序统计 ✓        |
-
-
-### VI. 博弈论与对抗推理
-
-*施法者/战斗者间策略交互中的最优行动。*
-
-
-| #   | 场景           | 关键定理                                | 结果                |
-| --- | ------------ | ----------------------------------- | ----------------- |
-| P11 | 反制法术战        | `game_tree_finite` — 博弈树深度 ≤ 施法者数量  | `native_decide` ✓ |
-| P23 | 双生加速术 + 专注中断 | `break_round_2 = 0` — 对手盈亏平衡点在第 2 轮 | `native_decide` ✓ |
-| P26 | 擒抱/推挤锁定      | `threshold_is_6` — 维持 3 轮锁定需 +6 运动  | `native_decide` ✓ |
-
-
-### VII. 组合优化
-
-*构建选择、队伍组成、资源调度——通常为 NP 困难，利用 BG3 实例规模小的特点精确求解。*
-
-
-| #   | 场景     | 关键定理                                                      | 结果                  |
-| --- | ------ | --------------------------------------------------------- | ------------------- |
-| P13 | 偷袭资格   | `eligible_ratio = 832` — 832/2048 状态允许偷袭（40.6%）           | 2¹¹ 枚举 ✓            |
-| P20 | 队伍组成   | `minimum_cover_size_is_3` — 3 个职业覆盖全部 8 种角色；2 个不行         | C(12,2) + C(12,3) ✓ |
-| P24 | 休息调度   | `smart_beats_greedy6` — 贪心短休策略非最优                         | 反例 ✓                |
-| P27 | 专长选择   | `greedy_suboptimal` — 协同效应使贪心失败；GWM+PAM+哨兵最优              | C(12,3) QUBO ✓      |
-| P30 | 狂野魔法涌动 | `positive_expected_value`, `high_variance` — 期望为正但方差远大于均值 | 统计 ✓                |
-| P31 | 治疗效率   | `healing_word_theorem` — 攻击 DPR ≥ 8 时，治疗之言优于疗伤术           | `omega` ✓（全称）       |
-| P32 | 多职业兼职  | `rogue_dip_improves_fighter` — 纯职业构建非最优                   | 穷举整数规划 ✓            |
-
+- 26 份场景草稿 `P6–P13、P15–P32`（现位于 `Scenarios_wip/`）。其中包含若干使用了已弃用接口（如 Lean 4.29 重命名后的 `List` API）或在 `native_decide` 下被判为假的占位定理，每一项均作为 v0.2 工作项跟踪。
+- `Axioms/BG3Rules.lean` 中的六条规则公理（`hellish_rebuke_trigger`、`concentration_uniqueness`、`haste_self_cast_bug`、`fireball_damage`、`counterspell_uses_intelligence`、`hex_crit_bug`）：这些是**对 BG3 引擎行为的假设**，由验证管道中的神谕阶段负责，而非由内核负责。所有依赖它们的定理通过 `#print axioms` 都会显式列出这些公理。
 
 ---
 
-## 可靠性
+## 可信性、TCB 与「模型–游戏」缺口
 
-本仓库中的每一个 `theorem` 都是由 Lean 4 内核类型检查的证明项——包括使用 `native_decide` 的定理。与测试的区别在于，`native_decide` 是**有限域上的穷举模型检查**（由内核认证），而非抽样。
+默认构建目标中的每一条 `theorem` 均为经过 Lean 4 内核类型检查的证明项。`native_decide` 是**有限域穷举模型检查**，结论附带内核可校验的证书，并非抽样。
 
-### 可信计算基（TCB）
+**可信计算基（TCB）**：在任意文件中执行 `#print axioms <theorem>` 即可枚举该证明所依赖的全部公理。已验证核心的公理集合为：
 
-所有证明归约为 Lean 4 内核及以下公理（可通过 `#print axioms` 验证）：
+| 公理                                            | 来源                       | 备注                                                |
+| ----------------------------------------------- | -------------------------- | --------------------------------------------------- |
+| `propext`                                       | Lean 4 核心                | 命题外延性                                           |
+| `Quot.sound`                                    | Lean 4 核心                | 商类型可靠性                                         |
+| `Classical.choice`                              | Lean 4 核心                | 由 `simp`/`decide` 基础设施使用                      |
+| `Lean.ofReduceBool`                             | `native_decide`            | 信任已编译的归约；TCB 与 Mathlib 一致                |
+| （`Axioms/BG3Rules.lean` 中六条 BG3 公理）        | 对游戏引擎的假设           | 显式列出；由神谕阶段负责对其加以校验                  |
 
-
-| 公理                  | 来源              | 说明                      |
-| ------------------- | --------------- | ----------------------- |
-| `propext`           | Lean 4 核心       | 命题外延性                   |
-| `Quot.sound`        | Lean 4 核心       | 商类型可靠性                  |
-| `Classical.choice`  | Lean 4 核心       | `simp` 策略使用             |
-| `Lean.ofReduceBool` | `native_decide` | 信任编译归约；与 mathlib TCB 相同 |
-
-
-`Scenarios/` 下无任何自定义 `axiom` 声明。`Axioms/BG3Rules.lean` 中的公理（P1–P5）是为 LLM 管线设计的独立形式化目标，**不被**任何场景文件导入。
-
-### 证明技术分类
-
-
-| 技术                     | 证明了什么                    | 示例                             |
-| ---------------------- | ------------------------ | ------------------------------ |
-| `native_decide` + 枚举   | **穷举模型检查**：检查所有状态，生成证明证书 | P13：全部 2048 个布尔状态              |
-| `native_decide` + 具体值  | **验证计算**：确认特定实例          | P12：`crit_max = 127`           |
-| `omega`、`simp`、`cases` | **结构化证明**：对所有输入成立（全称量化）  | P6：`cascade_always_terminates` |
-| `sorry`                | **开放问题**：已陈述但未证明，明确标注    | P7：`esl_le_total_level`        |
-
-
-具体而言：27 个场景中有 11 个包含至少一个由结构化策略（非 `native_decide`）证明的全称量化定理。其余场景使用有限域上的穷举枚举，这是标准的验证型模型检查技术。
-
-### 模型忠实度
-
-Lean 模型编码的是 [bg3.wiki](https://bg3.wiki) 的规则描述，而非游戏二进制文件。这构成了潜在鸿沟：
-
-
-| 层级       | 信任对象                    | 弥合方式                      |
-| -------- | ----------------------- | ------------------------- |
-| Lean 模型  | bg3.wiki 正确             | 游戏内预言机将预测与真实引擎比对          |
-| bg3.wiki | 社区逆向工程                  | 与游戏数据文件交叉验证；wiki 拥有逾万名编辑者 |
-| 游戏内预言机   | BG3 Script Extender API | SE 是标准 Mod 框架，为社区广泛使用     |
-
-
-CEGAR 循环旨在迭代地弥合此鸿沟：当预言机与模型出现分歧，差异将作为修正反馈至 LLM。当前 `v0.1-alpha` 提供 Lean 验证层；预言机集成已可用但需手动游戏交互。
+**模型–游戏缺口**：Lean 模型对应 [bg3.wiki](https://bg3.wiki) 上的规则描述，而 wiki 本身是社区对游戏二进制的逆向工程。CEGAR 闭环正是用以收敛该缺口的机制——一旦游戏内神谕观察到与模型的偏差，该偏差便回灌至 LLM 阶段作为修正素材。在 `v0.1-alpha` 中，闭环以合成日志端到端运行（见 `eval/run_feedback_loop.py`），v0.2 将接入运行中的游戏。
 
 ---
 
-## 实际运行效果
+## 游戏内自验证教程（P14）
 
-### 1. 验证定理（终端）
+`Scenarios/P14_AdvantageAlgebra.lean` 中除其他命题外证明了：
 
-```
-$ cd src/2_fv_core && lake build
-Building Scenarios.P13_SneakAttackSAT
-Building Scenarios.P21_DeathSaveMarkov
-Building Scenarios.P29_CoffeelockInfiniteSlots
-...
-Build completed successfully.     # 所有定理已通过类型检查
-```
+> `adv_dc11`：在 DC 11 的 d20 检定上拥有优势时，成功概率恰为 `300/400 = 75 %`。
 
-### 2. 爬取游戏数据（终端）
+下面给出在游戏内对该结论作经验验证的步骤。
 
 ```
-$ python3 -c "import importlib; importlib.import_module('src.1_auto_formalizer.crawler').crawl_all()"
-[INFO] Discovering spells in Category:Spells...
-[INFO] Found 347 spell pages
-[INFO] Fetching Fireball... OK (Projectile_Fireball, 8d6 Fire)
-...
-[INFO] Crawl complete: 312 spells stored in dataset/valor.db
+步骤 1.  安装 BG3 Script Extender (https://github.com/Norbyte/bg3se)。
+
+步骤 2.  把 VALOR mod 复制到 SE 的 Lua 目录：
+           cp src/4_ingame_oracle/Mods/VALOR_Injector/*.lua "<BG3_SE_Lua_Dir>/"
+           mkdir -p "<BG3_SE_Lua_Dir>/VALOR_Scripts"
+           mkdir -p "<BG3_SE_Lua_Dir>/VALOR_Logs"
+
+         各平台对应的 <BG3_SE_Lua_Dir>：
+           Linux：   ~/.local/share/Larian Studios/Baldur's Gate 3/Script Extender/Lua/
+           Windows： %LOCALAPPDATA%/Larian Studios/Baldur's Gate 3/Script Extender/Lua/
+           macOS：   ~/Library/Application Support/Larian Studios/Baldur's Gate 3/Script Extender/Lua/
+
+步骤 3.  启动 BG3，加载任意存档，打开 SE 控制台（默认快捷键：F10）。
+         应当看到："[VALOR] Session loaded, polling VALOR_Scripts/"
+
+步骤 4.  生成 P14 的测试脚本（DC 11、优势、1000 次重复）：
+           python3 -m src.3_engine_bridge.lua_generator \
+             --scenario p14_adv_dc11 --trials 1000 \
+             --out "<BG3_SE_Lua_Dir>/VALOR_Scripts/p14.lua"
+
+步骤 5.  在游戏内进入任意战斗（保证引擎处于「活跃」状态）。
+         mod 会自动检测并执行该脚本，并写出 JSON 日志：
+           "<BG3_SE_Lua_Dir>/VALOR_Logs/p14.json"
+
+步骤 6.  与理论值比较：
+           python3 -m src.3_engine_bridge.log_analyzer \
+             --scenario p14_adv_dc11 \
+             --log    "<BG3_SE_Lua_Dir>/VALOR_Logs/p14.json" \
+             --expect 0.75 --tolerance 0.04
+         期望输出："AGREE: observed 0.74 ± 0.014, theoretical 0.75"。
 ```
 
-### 3. 游戏内验证（分步教程）
-
-**示例**：P12 声称圣骑士6/术士6持巨剑，4环神圣惩击暴击亡灵，最大伤害为 127。
-
-```
-步骤 1.  安装 BG3 Script Extender（github.com/Norbyte/bg3se）。
-
-步骤 2.  将 VALOR Mod 复制到 Script Extender 目录：
-           cp src/4_ingame_oracle/Mods/VALOR_Injector/*.lua "<BG3_SE_Lua目录>/"
-         在 BootstrapServer.lua 中添加：
-           Ext.Require("main")
-         创建目录：
-           mkdir -p "<BG3_SE_Lua目录>/VALOR_Scripts"
-           mkdir -p "<BG3_SE_Lua目录>/VALOR_Logs"
-
-步骤 3.  启动 BG3，加载存档，打开 SE 控制台（默认 F10）。
-         应看到："[VALOR] Session loaded, polling VALOR_Scripts/"
-
-步骤 4.  手动重现场景：
-           a. 创建或重置圣骑士6/术士6角色（力量20）
-           b. 装备巨剑
-           c. 找到或召唤亡灵敌人
-           d. 存档
-           e. 使用 4 环神圣惩击攻击
-           f. 若暴击：记录伤害提示
-
-步骤 5.  比对：
-           Lean 预测：最大 127（4d6 武器 + 12d8 惩击 + 7 固定）
-           游戏提示：应显示 ≤ 127 总伤害
-
-         若游戏显示不同数值，即为模型-引擎分歧——
-         请提交 Issue 或 Pull Request。
-```
+若比较结果在容忍区间外，则视为一次 *偏差*（divergence），即下一轮 CEGAR 的输入。
 
 ---
 
-## 目录结构
+## 仓库结构
 
 ```
 src/
-  1_auto_formalizer/     Python：Wiki 爬虫、解析器、SQLite 数据库、LLM 存根
+  1_auto_formalizer/     Python：wiki 爬虫、解析器、SQLite 数据库、LLM 桩
   2_fv_core/
-    Core/                Lean 4 游戏本体论 + 状态机
-    Axioms/              形式化 BG3 规则（P1–P5，隔离，不被 Scenarios 导入）
-    Proofs/              终止性与漏洞利用证明
-    Scenarios/           自包含场景 P6–P32（核心贡献）
-    lakefile.lean        构建清单
+    lean-toolchain       已固定为：leanprover/lean4:v4.29.1
+    lakefile.lean        构建清单（默认目标 = 已验证核心）
+    Core/                Lean 4 游戏本体 + 状态机
+    Axioms/              形式化的 BG3 规则（P1–P5）
+    Proofs/              终止性 + 套路证明
+    Scenarios/           v0.1 已验证场景（P14）
+    Scenarios_wip/       v0.2 草稿（P6–P13、P15–P32；不在默认构建中）
   3_engine_bridge/       Python：Lean 输出 → Lua 脚本 → 日志分析
-  4_ingame_oracle/       Lua：BG3 Script Extender Mod
-eval/                    反馈循环编排器 + 指标收集
-tests/                   23 个 pytest 测试（Python 层）
-dataset/                 原始 Wiki 转储 + 手工标注基准
+  4_ingame_oracle/       Lua：BG3 Script Extender mod
+eval/                    反馈循环编排器 + 指标采集
+tests/                   55 项 pytest（模型、解析器、数据库、桥层）
+dataset/                 原始 wiki 转储 + 人工标注基准
 ```
+
+## 添加新场景
+
+新建 `src/2_fv_core/Scenarios/P33_YourProblem.lean`：
+
+```lean
+namespace VALOR.Scenarios.P33
+
+def myMechanic (x : Nat) : Nat := x * x
+
+theorem my_property : myMechanic 7 = 49 := by native_decide
+
+end VALOR.Scenarios.P33
+```
+
+将 `` `Scenarios.P33_YourProblem `` 加入 `src/2_fv_core/lakefile.lean` 中默认目标 `lean_lib VALOR` 的 `roots` 列表，然后执行 `lake build`。无需改动其他文件。
 
 ## 参考文献
 
-- Clarke et al. (2000). Counterexample-Guided Abstraction Refinement. *CAV*.
-- de Moura & Ullrich (2021). The Lean 4 Theorem Prover. *CADE*.
-- [sts_lean](https://github.com/collinzrj/sts_lean) — 《杀戮尖塔》无限连击的 Lean 4 形式化验证。
-- [bg3.wiki](https://bg3.wiki) — 社区 Wiki，唯一数据来源。
+- Clarke、Grumberg、Jha、Lu 与 Veith（2000）。*Counterexample-Guided Abstraction Refinement.* CAV.
+- de Moura 与 Ullrich（2021）。*The Lean 4 Theorem Prover and Programming Language.* CADE.
+- Ginsberg（1988）。*Multivalued Logics: A Uniform Approach to Inference in Artificial Intelligence.* Computational Intelligence.
+- [`sts_lean`](https://github.com/collinzrj/sts_lean) —— 《杀戮尖塔》无限连击的 Lean 4 验证。
+- [bg3.wiki](https://bg3.wiki) —— 社区维护的 wiki，唯一数据来源。
 
 ## 许可证
 
 MIT
-
----
-
-*本文档为 `v0.1-alpha` 版本的归档中文翻译。英文版 README.md 为首要更新版本。*
