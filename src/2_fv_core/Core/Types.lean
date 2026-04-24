@@ -118,6 +118,11 @@ structure EntityId where
   val : Nat
   deriving DecidableEq, Repr
 
+/-- An `Entity` is a combat participant (PC, NPC, summon).
+
+`resistances` is stored as an association list rather than a function
+so the structure remains `Repr`-able and serialisable; lookup goes
+through `Entity.resistance`. -/
 structure Entity where
   id              : EntityId
   name            : String
@@ -127,11 +132,34 @@ structure Entity where
   abilities       : AbilityScores
   proficiencyBonus : Nat := 2
   conditions      : List ActiveCondition := []
-  resistances     : DamageType → DamageRelation := fun _ => .neutral
+  resistances     : List (DamageType × DamageRelation) := []
   spellSlots      : List (Nat × Nat)  := []  -- (level, remaining)
   reactionUsed    : Bool := false
   concentratingOn : Option String := none
   deriving Repr
+
+/-- A canonical "empty" entity, used as a default for partial lookups
+    (e.g. `(gs.getEntity id).get!` in axiom statements). -/
+instance : Inhabited Entity where
+  default :=
+    { id              := ⟨0⟩
+      name            := ""
+      hp              := 0
+      maxHp           := 0
+      ac              := 0
+      abilities       := {}
+      proficiencyBonus := 2
+      conditions      := []
+      resistances     := []
+      spellSlots      := []
+      reactionUsed    := false
+      concentratingOn := none }
+
+/-- Lookup the entity's relation against `dt`; defaults to `.neutral`. -/
+def Entity.resistance (e : Entity) (dt : DamageType) : DamageRelation :=
+  match e.resistances.find? (fun ⟨t, _⟩ => t == dt) with
+  | some ⟨_, rel⟩ => rel
+  | none          => .neutral
 
 def Entity.isAlive (e : Entity) : Prop := e.hp > 0
 def Entity.isDowned (e : Entity) : Prop := e.hp ≤ 0
@@ -171,7 +199,7 @@ structure TurnOrder where
   deriving Repr
 
 def TurnOrder.currentEntity (t : TurnOrder) : Option EntityId :=
-  t.order.get? t.currentIndex
+  t.order[t.currentIndex]?
 
 structure GameState where
   entities    : List Entity
@@ -191,13 +219,14 @@ def GameState.hpNonneg (gs : GameState) : Prop :=
   ∀ e ∈ gs.entities, e.hp ≥ -e.maxHp  -- can go negative up to −maxHp (instant death)
 
 def GameState.atMostOneConcentration (gs : GameState) : Prop :=
-  ∀ e ∈ gs.entities, (e.concentratingOn.isSome →
-    ¬ ∃ c ∈ e.conditions, c.tag == .concentrating ∧ c.sourceEntity ≠ some e.id.val)
+  ∀ e ∈ gs.entities, e.concentratingOn.isSome →
+    ¬ ∃ c ∈ e.conditions,
+        c.tag = .concentrating ∧ c.sourceEntity ≠ some e.id.val
 
 def GameState.reactionsBounded (gs : GameState) : Prop :=
   ∀ e ∈ gs.entities, e.reactionUsed = true ∨
     (gs.eventLog.filter (fun ev => match ev with
-      | .useReaction r _ _ => r == e.id
+      | .useReaction r _ _ => decide (r = e.id)
       | _ => false)).length ≤ 1
 
 end VALOR

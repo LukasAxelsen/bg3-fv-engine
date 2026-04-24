@@ -22,10 +22,6 @@ jobs:
 
   lean-build:
     runs-on: ubuntu-latest
-    # Lean scenarios are v0.1-alpha and pinned for reproducibility, but a
-    # number of files predate the Lean 4.29 List API rename and other recent
-    # core changes. Job is informational; failures do not block CI.
-    continue-on-error: true
     defaults:
       run:
         working-directory: src/2_fv_core
@@ -39,7 +35,12 @@ jobs:
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
       - name: Install Lean toolchain
         run: lake --version
-      - name: Generate lake manifest
-        run: lake update
-      - name: Build
+      - name: Build verified core (default target)
         run: lake build
+      - name: Sanity check — no axiom-introducing `sorry` in default target
+        run: |
+          set -e
+          if grep -RnE '^[^-/]*\bsorry\b' Core Axioms Proofs Scenarios; then
+            echo "::error::sorry detected in default-target sources"
+            exit 1
+          fi

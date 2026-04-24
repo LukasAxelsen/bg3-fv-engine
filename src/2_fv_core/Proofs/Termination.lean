@@ -1,3 +1,7 @@
+import Core.Types
+import Core.Engine
+import Axioms.BG3Rules
+
 /-!
 # Termination.lean — Reaction-Chain Termination & Progress Proofs
 
@@ -14,10 +18,6 @@ Each reaction strictly decreases this measure → termination by
 well-founded induction.
 -/
 
-import Core.Types
-import Core.Engine
-import Axioms.BG3Rules
-
 namespace VALOR.Proofs.Termination
 
 open VALOR
@@ -32,7 +32,7 @@ def reactionFuel (s : Rules.ReactionChainState) : Nat :=
 the fuel, and fuel is a natural number, so the chain must terminate.
 -/
 theorem reaction_decreases_fuel (s : Rules.ReactionChainState) (e : EntityId)
-    (h_can : s.canReact e = true)
+    (_h_can : s.canReact e = true)
     (h_bound : s.reactionsUsed.length < s.entities.length) :
     reactionFuel (s.useReaction e) < reactionFuel s := by
   simp [reactionFuel, Rules.ReactionChainState.useReaction]
@@ -50,24 +50,25 @@ theorem max_chain_length (s : Rules.ReactionChainState)
 -- ── Progress: the game loop never deadlocks ─────────────────────────────
 
 /--
-From any reachable state, the `passTurn` event is always valid,
-ensuring the game loop can always advance.
--/
+From any reachable state in which entity `e` exists, the `passTurn`
+event is always valid: the game loop never deadlocks.
+
+`step` is non-recursive (factored via `stepEndTurn`), so the proof is
+a direct case-split on whether `getEntity` returns `some`. -/
 theorem pass_turn_always_valid (gs : GameState) (e : EntityId)
     (h : (gs.getEntity e).isSome) :
     (step gs (.passTurn e)).isSome := by
-  simp [step]
-  sorry -- requires unfolding step for passTurn → endTurn; mechanically true
+  simp only [step, stepEndTurn]
+  cases hge : gs.getEntity e with
+  | none      => simp [hge] at h
+  | some _ent => simp
 
 /--
-End-of-turn condition ticking preserves list structure (no panic).
--/
+End-of-turn condition ticking preserves list structure: the resulting
+list is no longer than the input.  Follows from `List.length_filterMap_le`. -/
 theorem tick_preserves_length (tp : TickType) (cs : List ActiveCondition) :
     (tickConditions tp cs).length ≤ cs.length := by
-  induction cs with
-  | nil => simp [tickConditions]
-  | cons c rest ih =>
-    simp [tickConditions, List.filterMap]
-    sorry -- requires case split on tickType match; provable
+  unfold tickConditions
+  exact List.length_filterMap_le _ _
 
 end VALOR.Proofs.Termination

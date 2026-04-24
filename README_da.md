@@ -1,5 +1,10 @@
 # VALOR `v0.1-alpha`
 
+> ⚠️ **Denne danske udgave svarer til et tidligere `v0.1-alpha`-udkast og er arkiveret.**
+> Det aktuelle, reviderede verifikationsomfang står i den
+> [engelske README](README.md).  Den danske oversættelse opdateres
+> kun ved eksplicit anmodning.
+
 **Verified Automated Loop for Oracle-driven Rule-checking**
 
 [English](README.md) | [中文](README_zh.md) | [Dansk](README_da.md)

@@ -1,9 +1,11 @@
+import Core.Types
+
 /-!
 # Engine.lean — Abstract State-Machine Transition Semantics
 
-Defines `step : GameState → Event → GameState`, the pure operational
-semantics of BG3 combat.  This is the kernel against which all proofs
-and counterexample searches run.
+Defines `step : GameState → Event → Option GameState`, the pure
+operational semantics of BG3 combat.  This is the kernel against which
+all proofs and counterexample searches run.
 
 ## Key design choices
 
@@ -15,8 +17,6 @@ and counterexample searches run.
 3. **Reaction recursion**: reactions (Counterspell, Hellish Rebuke) can
    trigger further reactions.  Termination.lean proves this is bounded.
 -/
-
-import Core.Types
 
 namespace VALOR
 
@@ -33,7 +33,7 @@ def applyDamageRelation (base : Int) (rel : DamageRelation) : Int :=
 def Entity.applyDamage (e : Entity) (rolls : List DamageRoll) : Entity :=
   let totalDmg := rolls.foldl (fun acc r =>
     let maxDmg := r.dice.maxVal  -- worst-case for verification
-    acc + applyDamageRelation maxDmg (e.resistances r.dmgType)
+    acc + applyDamageRelation maxDmg (e.resistance r.dmgType)
   ) (0 : Int)
   { e with hp := e.hp - totalDmg }
 
@@ -107,12 +107,27 @@ def tickConditions (tickPoint : TickType) (conditions : List ActiveCondition) : 
 
 -- ── The core transition function ────────────────────────────────────────
 
-/--
-`step gs event` applies a single event to the game state.
+/-! ## The core transition function
 
-Returns `none` if the event is invalid in the current state (e.g.
-no spell slot available, dead entity acting, etc.).
--/
+`step gs event` applies a single event to the game state and returns
+`none` if the event is invalid in the current state (no spell slot
+available, dead entity acting, etc.).
+
+We factor out a shared end-of-turn handler `stepEndTurn` so that both
+the `.endTurn` and `.passTurn` events delegate to it.  This keeps
+`step` non-recursive, eliminating the need for `partial def`. -/
+
+/-- Shared end-of-turn handler used by both the `.endTurn` and
+    `.passTurn` events. -/
+def stepEndTurn (gs : GameState) (entityId : EntityId) : Option GameState :=
+  match gs.getEntity entityId with
+  | none => none
+  | some entity =>
+    let entity' :=
+      { entity with conditions := tickConditions .endTurn entity.conditions }
+    let gs' := gs.updateEntity entityId (fun _ => entity')
+    some { gs' with turnOrder := gs'.turnOrder.advance }
+
 def step (gs : GameState) (event : Event) : Option GameState :=
   match event with
 
@@ -159,17 +174,10 @@ def step (gs : GameState) (event : Event) : Option GameState :=
       else some (gs.updateEntity reactorId (fun e => { e with reactionUsed := true }))
 
   | .endTurn entityId =>
-    match gs.getEntity entityId with
-    | none => none
-    | some entity =>
-      let entity' := { entity with
-        conditions := tickConditions .endTurn entity.conditions
-      }
-      let gs' := gs.updateEntity entityId (fun _ => entity')
-      some { gs' with turnOrder := gs'.turnOrder.advance }
+    stepEndTurn gs entityId
 
   | .passTurn entityId =>
-    step gs (.endTurn entityId)
+    stepEndTurn gs entityId
 
   | .weaponAttack _attackerId _targetId _weaponName =>
     some gs  -- weapon attack resolution delegated to axioms

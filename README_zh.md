@@ -1,5 +1,9 @@
 # VALOR `v0.1-alpha`
 
+> ⚠️ **此中文版本对应早期 `v0.1-alpha` 草案，已归档。**
+> 当前 `v0.1-alpha` 的可验证范围已大幅收窄并经过严格审计，请以
+> [英文 README](README.md) 为准。本中文版仅在显式请求下与英文版同步。
+
 **Verified Automated Loop for Oracle-driven Rule-checking**
 
 [English](README.md) | [中文](README_zh.md) | [Dansk](README_da.md)

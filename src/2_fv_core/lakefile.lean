@@ -32,6 +32,19 @@ package VALOR_FV where
     ⟨`autoImplicit, false⟩
   ]
 
+/-- Default build target: the v0.1-alpha verified core.
+
+  Includes the foundational ontology (`Core`), the formalised BG3
+  axioms (`Axioms.BG3Rules`), the safety/termination meta-properties
+  (`Proofs`), and the one fully-formalised showcase scenario
+  (`Scenarios.P14_AdvantageAlgebra`).  `lake build` on the default
+  target must succeed with zero `error`-level diagnostics.
+
+  Additional draft scenarios (P6-P13, P15-P32) live under
+  `Scenarios_wip/` and are excluded from the default build target.
+  They are tracked for v0.2 and can be built individually with
+  `lake build Scenarios_wip.P<N>_<slug>` once each is upgraded for
+  the Lean 4.29 core API. -/
 @[default_target]
 lean_lib VALOR where
   srcDir := "."
@@ -39,18 +52,11 @@ lean_lib VALOR where
     `Core.Types, `Core.Engine,
     `Axioms.BG3Rules,
     `Proofs.Exploits, `Proofs.Termination,
-    `Scenarios.P6_AgathysRebukeCascade, `Scenarios.P7_MulticlassSpellSlots,
-    `Scenarios.P8_ConcentrationSaveChain, `Scenarios.P9_SurfaceInteractions,
-    `Scenarios.P10_DRSDamageCeiling, `Scenarios.P11_CounterspellWar,
-    `Scenarios.P12_SmiteCritDamage, `Scenarios.P13_SneakAttackSAT,
-    `Scenarios.P14_AdvantageAlgebra, `Scenarios.P15_SorceryPointEconomy,
-    `Scenarios.P16_UpcastEfficiency, `Scenarios.P17_DualWieldCrossover,
-    `Scenarios.P18_KarmicDiceBias, `Scenarios.P19_WetLightningChain,
-    `Scenarios.P20_PartyCompositionCover, `Scenarios.P21_DeathSaveMarkov,
-    `Scenarios.P22_ActionSurgeExplosion, `Scenarios.P23_TwinHasteAdversarial,
-    `Scenarios.P24_RestResourceScheduling, `Scenarios.P25_BardicInspirationDominance,
-    `Scenarios.P26_GrappleShoveNim, `Scenarios.P27_FeatKnapsack,
-    `Scenarios.P28_InitiativeFirstStrike, `Scenarios.P29_CoffeelockInfiniteSlots,
-    `Scenarios.P30_WildMagicFairness, `Scenarios.P31_HealingEfficiency,
-    `Scenarios.P32_MulticlassDipOptimization
+    `Scenarios.P14_AdvantageAlgebra
   ]
+
+/-- Optional library: draft scenarios pending Lean 4.29 upgrade.
+    Built only when explicitly requested (`lake build VALOR_WIP`). -/
+lean_lib VALOR_WIP where
+  srcDir := "."
+  globs  := #[.submodules `Scenarios_wip]

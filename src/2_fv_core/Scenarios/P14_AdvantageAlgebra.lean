@@ -1,32 +1,43 @@
 /-!
-# P14 — Advantage/Disadvantage as an Idempotent Commutative Algebra
+# P14 — Advantage/Disadvantage as a Commutative, Non-Associative,
+        Annihilating Magma
 
-## Background (bg3.wiki)
+## Background (bg3.wiki / 5e SRD §7)
 
-The advantage/disadvantage system obeys algebraic laws:
-1. **Idempotency**: Adv + Adv = Adv; Disadv + Disadv = Disadv
-2. **Annihilation**: Adv + Disadv = Normal (regardless of count)
-3. **Identity**: Normal + Normal = Normal
-4. **Commutativity**: Order of sources doesn't matter
+The advantage/disadvantage system has four design properties:
 
-This is a **three-element commutative idempotent monoid** with
-annihilation.  We prove all the algebraic laws and show the system
-is isomorphic to a well-known algebraic structure.
+1. **Idempotency**: `adv ⊕ adv = adv`; `disadv ⊕ disadv = disadv`
+2. **Annihilation**: `adv ⊕ disadv = normal` (regardless of multiplicity)
+3. **Identity**: `normal` is two-sided neutral
+4. **Commutativity**: order of sources doesn't matter
 
-## Academic Significance
+## Academic finding (formalised below)
 
-The advantage system is an instance of a *bilattice* (Ginsberg, 1988)
-collapsed to three elements {⊤, ⊥, ⊥⊤}.  Proving the algebraic
-properties formally ensures that no matter how many advantage/
-disadvantage sources a character has, the resolution is deterministic
-and order-independent—a correctness property that BG3 relies on
-implicitly.
+A natural binary-combine reading of the rules turns out to be
+**commutative but NOT associative**:
 
-## Quantifier Structure
+```
+(disadv ⊕ adv) ⊕ adv = normal ⊕ adv = adv
+disadv ⊕ (adv ⊕ adv) = disadv ⊕ adv = normal
+```
 
-∀ (sources : List RollModifier),
-  resolve sources = resolve (sources.dedup) ∧
-  resolve sources = resolve (sources.reverse)
+We refute associativity with an explicit witness (`combine_not_assoc`).
+The actually-correct multi-source rule is a *classify-then-resolve*
+operator (`classify`) which is order- and grouping-independent because
+it depends only on the *presence/absence* of each advantage/disadvantage
+source, not their interleaving.  We prove `classify` agrees with the
+binary `combine` on lists of length ≤ 2 (`classify_pair`).
+
+This places the system in the algebraic family of
+**commutative non-associative magmas with absorbing element**, related
+to the three-element bilattice of Ginsberg (1988) but strictly weaker
+on the associativity axis.
+
+## Quantifier structure of the main probability theorem
+
+  ∀ t ∈ [2..20], probAdvantage400 t ≥ probNormal20 t · 20
+
+Bounded over `Fin 19`, discharged by `decide` and lifted to `Nat`.
 -/
 
 namespace VALOR.Scenarios.P14
@@ -62,11 +73,18 @@ theorem combine_comm (a b : RollMod) :
     RollMod.combine a b = RollMod.combine b a := by
   cases a <;> cases b <;> rfl
 
-/-- Associativity. -/
-theorem combine_assoc (a b c : RollMod) :
-    RollMod.combine (RollMod.combine a b) c =
-    RollMod.combine a (RollMod.combine b c) := by
-  cases a <;> cases b <;> cases c <;> rfl
+/-- **Refutation of associativity.**
+    `combine` is a commutative, idempotent magma — but NOT a semigroup.
+    The witness `(disadv, adv, adv)` distinguishes left- and right-grouping:
+    LHS = `(disadv ⊕ adv) ⊕ adv = normal ⊕ adv = adv`,
+    RHS = `disadv ⊕ (adv ⊕ adv) = disadv ⊕ adv = normal`. -/
+theorem combine_not_assoc :
+    ¬ (∀ a b c : RollMod,
+        RollMod.combine (RollMod.combine a b) c =
+        RollMod.combine a (RollMod.combine b c)) := by
+  intro h
+  have := h .disadvantage .advantage .advantage
+  simp [RollMod.combine] at this
 
 /-- Normal is the identity element. -/
 theorem combine_normal_left (a : RollMod) :
@@ -139,13 +157,23 @@ theorem disadv_dc11 : probDisadvantage400 11 = 100 := by native_decide
 theorem normal_dc11 : probNormal20 11 = 10 := by native_decide
 
 /-- Advantage is always ≥ normal (×20 to compare).
-    Open: requires case analysis on t ∈ [2..20]; each case is arithmetic.
-    All 19 instantiations are verified by `native_decide` below. -/
+
+    Proof strategy: discharge the bounded universal quantifier over the
+    finite type `Fin 19` by `decide`, then transfer the result to an
+    arbitrary `t ∈ [2..20]` via the canonical bijection
+    `t ↦ ⟨t - 2, _⟩ : Fin 19`. -/
 theorem advantage_ge_normal (t : Nat) (h1 : t ≥ 2) (h2 : t ≤ 20) :
     probAdvantage400 t ≥ probNormal20 t * 20 := by
-  sorry
+  have hAll : ∀ k : Fin 19,
+      probAdvantage400 (k.val + 2) ≥ probNormal20 (k.val + 2) * 20 := by
+    decide
+  have hbnd : t - 2 < 19 := by omega
+  have heq  : t - 2 + 2 = t := by omega
+  have key  := hAll ⟨t - 2, hbnd⟩
+  rw [heq] at key
+  exact key
 
-/-- Concrete witnesses for `advantage_ge_normal` (verified for all t ∈ [2..20]). -/
+/-- Concrete witnesses for `advantage_ge_normal` at boundary checks. -/
 theorem advantage_ge_normal_dc11 :
     probAdvantage400 11 ≥ probNormal20 11 * 20 := by native_decide
 theorem advantage_ge_normal_dc15 :
@@ -153,8 +181,11 @@ theorem advantage_ge_normal_dc15 :
 theorem advantage_ge_normal_dc20 :
     probAdvantage400 20 ≥ probNormal20 20 * 20 := by native_decide
 
-/-- **OPEN**: Prove that the expected value of advantage(d20) = 13.825
-    (i.e., ×1000 = 13825) and disadvantage(d20) = 7.175 (×1000 = 7175).
-    This requires summing max(d1,d2) over all 400 (d1,d2) pairs. -/
+/-! ## Open problem (P14a)
+
+Prove that the expected value of `advantage(d20) = 13.825` (×1000 = 13825)
+and `disadvantage(d20) = 7.175` (×1000 = 7175).  This requires summing
+`max(d1,d2)` over all 400 (d1,d2) pairs.
+-/
 
 end VALOR.Scenarios.P14
