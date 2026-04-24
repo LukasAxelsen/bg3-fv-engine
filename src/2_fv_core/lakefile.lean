@@ -33,14 +33,24 @@ package VALOR_FV where
   ]
 
 @[default_target]
-lean_lib Core where
-  srcDir := "Core"
-
-lean_lib Axioms where
-  srcDir := "Axioms"
-
-lean_lib Proofs where
-  srcDir := "Proofs"
-
-lean_lib Scenarios where
-  srcDir := "Scenarios"
+lean_lib VALOR where
+  srcDir := "."
+  roots := #[
+    `Core.Types, `Core.Engine,
+    `Axioms.BG3Rules,
+    `Proofs.Exploits, `Proofs.Termination,
+    `Scenarios.P6_AgathysRebukeCascade, `Scenarios.P7_MulticlassSpellSlots,
+    `Scenarios.P8_ConcentrationSaveChain, `Scenarios.P9_SurfaceInteractions,
+    `Scenarios.P10_DRSDamageCeiling, `Scenarios.P11_CounterspellWar,
+    `Scenarios.P12_SmiteCritDamage, `Scenarios.P13_SneakAttackSAT,
+    `Scenarios.P14_AdvantageAlgebra, `Scenarios.P15_SorceryPointEconomy,
+    `Scenarios.P16_UpcastEfficiency, `Scenarios.P17_DualWieldCrossover,
+    `Scenarios.P18_KarmicDiceBias, `Scenarios.P19_WetLightningChain,
+    `Scenarios.P20_PartyCompositionCover, `Scenarios.P21_DeathSaveMarkov,
+    `Scenarios.P22_ActionSurgeExplosion, `Scenarios.P23_TwinHasteAdversarial,
+    `Scenarios.P24_RestResourceScheduling, `Scenarios.P25_BardicInspirationDominance,
+    `Scenarios.P26_GrappleShoveNim, `Scenarios.P27_FeatKnapsack,
+    `Scenarios.P28_InitiativeFirstStrike, `Scenarios.P29_CoffeelockInfiniteSlots,
+    `Scenarios.P30_WildMagicFairness, `Scenarios.P31_HealingEfficiency,
+    `Scenarios.P32_MulticlassDipOptimization
+  ]

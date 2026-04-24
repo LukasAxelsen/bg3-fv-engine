@@ -14,9 +14,9 @@ Each reaction strictly decreases this measure → termination by
 well-founded induction.
 -/
 
-import VALOR.Core.Types
-import VALOR.Core.Engine
-import VALOR.Axioms.BG3Rules
+import Core.Types
+import Core.Engine
+import Axioms.BG3Rules
 
 namespace VALOR.Proofs.Termination
 

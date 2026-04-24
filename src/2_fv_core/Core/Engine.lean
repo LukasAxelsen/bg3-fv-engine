@@ -16,7 +16,7 @@ and counterexample searches run.
    trigger further reactions.  Termination.lean proves this is bounded.
 -/
 
-import VALOR.Core.Types
+import Core.Types
 
 namespace VALOR
 
