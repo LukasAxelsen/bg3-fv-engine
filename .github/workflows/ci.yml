@@ -22,9 +22,20 @@ jobs:
 
   lean-build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/2_fv_core
     steps:
       - uses: actions/checkout@v4
-      - uses: leanprover/lean-action@v1
-        with:
-          lake-package-directory: src/2_fv_core
-          use-mathlib-cache: "false"
+      - name: Install elan
+        run: |
+          set -e
+          curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
+            | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Install Lean toolchain
+        run: lake --version
+      - name: Generate lake manifest
+        run: lake update
+      - name: Build
+        run: lake build
