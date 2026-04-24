@@ -91,7 +91,7 @@ def _emit_apply_condition(event: Mapping[str, Any], uuid_for: Callable[[int], st
     tag = cond.get("tag") if isinstance(cond, Mapping) else None
     status = _slug(str(tag)) if tag is not None else "UNKNOWN_STATUS"
     turns = cond.get("turnsLeft") if isinstance(cond, Mapping) else None
-    duration = 1 if turns is None else int(turns) if turns is not None else -1
+    duration = 1 if turns is None else int(turns)
     return [f"Osi.ApplyStatus({uuid_for(target)}, {_lua_string(status)}, {duration}, {uuid_for(source)})"]
 
 

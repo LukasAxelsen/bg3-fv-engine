@@ -11,7 +11,7 @@ syntax used by every spell, condition, and feature article on bg3.wiki.
 from __future__ import annotations
 
 import re
-from typing import Any, Optional
+from typing import Optional
 
 from .models import (
     CastingResource,
@@ -117,13 +117,6 @@ def _strip_wiki_markup(text: str) -> str:
     text = re.sub(r"\{\{[^}]*\}\}", "", text)
     text = re.sub(r"<[^>]+>", "", text)
     text = re.sub(r"\s+", " ", text)
-    return text.strip()
-
-
-def _strip_templates(text: str) -> str:
-    """Remove all ``{{…}}`` templates, leaving raw text."""
-    while "{{" in text:
-        text = re.sub(r"\{\{[^{}]*\}\}", "", text)
     return text.strip()
 
 

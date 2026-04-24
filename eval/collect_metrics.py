@@ -134,10 +134,6 @@ def plot_accuracy_by_tier(
     plt.close(fig)
 
 
-def latex_escape(s: str) -> str:
-    return s.replace("_", r"\_").replace("%", r"\%")
-
-
 def export_booktabs_summary(summary: dict[str, Any], out_path: Path) -> None:
     lines = [
         r"\begin{tabular}{lr}",

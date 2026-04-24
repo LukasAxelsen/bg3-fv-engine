@@ -138,10 +138,14 @@ theorem disadv_dc11 : probDisadvantage400 11 = 100 := by native_decide
 /-- Normal DC 11: P = 10/20 = 50%. -/
 theorem normal_dc11 : probNormal20 11 = 10 := by native_decide
 
-/-- Advantage is always ≥ normal (×20 to compare). -/
+/-- Advantage is always ≥ normal (×20 to compare).
+    Proved by exhaustive case split on t ∈ [2..20]. -/
 theorem advantage_ge_normal (t : Nat) (h1 : t ≥ 2) (h2 : t ≤ 20) :
     probAdvantage400 t ≥ probNormal20 t * 20 := by
-  sorry -- requires case analysis on t ∈ [2..20]; each case is arithmetic
+  have : t = 2 ∨ t = 3 ∨ t = 4 ∨ t = 5 ∨ t = 6 ∨ t = 7 ∨ t = 8 ∨ t = 9 ∨
+         t = 10 ∨ t = 11 ∨ t = 12 ∨ t = 13 ∨ t = 14 ∨ t = 15 ∨ t = 16 ∨
+         t = 17 ∨ t = 18 ∨ t = 19 ∨ t = 20 := by omega
+  rcases this with h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h <;> subst h <;> native_decide
 
 /-- **OPEN**: Prove that the expected value of advantage(d20) = 13.825
     (i.e., ×1000 = 13825) and disadvantage(d20) = 7.175 (×1000 = 7175).

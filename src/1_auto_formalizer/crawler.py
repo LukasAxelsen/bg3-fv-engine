@@ -30,7 +30,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -184,6 +183,17 @@ def crawl_all(db_path: Path | None = None, dry_run: bool = False) -> list[CrawlR
     if not dry_run:
         db = SpellDB(db_path) if db_path else SpellDB()
 
+    try:
+        return _crawl_all_inner(client, db, dry_run)
+    finally:
+        client.close()
+        if db is not None:
+            db.close()
+
+
+def _crawl_all_inner(
+    client: httpx.Client, db: SpellDB | None, dry_run: bool
+) -> list[CrawlRecord]:
     pages = discover_spell_pages(client)
     records: list[CrawlRecord] = []
 
@@ -222,7 +232,6 @@ def crawl_all(db_path: Path | None = None, dry_run: bool = False) -> list[CrawlR
     )
     if db is not None:
         console.print(f"Database: {db.db_path}  ({db.count_spells()} spells)")
-        db.close()
 
     return records
 

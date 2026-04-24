@@ -1,5 +1,7 @@
 # VALOR `v0.1-alpha`
 
+[![CI](https://github.com/LukasAxelsen/bg3-fv-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/LukasAxelsen/bg3-fv-engine/actions)
+
 **Verified Automated Loop for Oracle-driven Rule-checking**
 
 [English](README.md) | [中文](README_zh.md) | [Dansk](README_da.md)
@@ -13,7 +15,7 @@ Inspired by [sts_lean](https://github.com/collinzrj/sts_lean). Where that projec
 ```bash
 git clone https://github.com/LukasAxelsen/bg3-fv-engine.git && cd bg3-fv-engine
 python3 -m pip install -r requirements.txt   # crawler + tests
-python3 -m pytest tests/ -v                  # 23 tests, <1s
+python3 -m pytest tests/ -v                  # 55 tests, <1s
 
 # Lean 4 verification (requires elan: https://github.com/leanprover/elan)
 cd src/2_fv_core && lake build               # type-checks all 27 scenarios
@@ -47,82 +49,96 @@ The loop (CEGAR-style, Clarke et al. 2000) iterates until the formal model and g
 
 *Chains of triggered game effects always halt.*
 
-| # | Scenario | Key Theorem | Method |
-|---|----------|-------------|--------|
-| P2 | Reaction chain | `reaction_decreases_fuel` — chain length ≤ entity count | well-founded recursion ✓ |
-| P6 | Agathys + Hellish Rebuke cascade | `cascade_always_terminates` — for ANY initial damage | `simp` ✓ (universal) |
-| P9 | Surface element interactions | `rewriting_terminates` — no infinite Fire↔Water loop | term rewriting ✓ |
-| P19 | Wet + Lightning | `wet_consumed_after_aoe` — Wet is a linear resource, consumed on use | Lyapunov function ✓ |
+
+| #   | Scenario                         | Key Theorem                                                          | Method                   |
+| --- | -------------------------------- | -------------------------------------------------------------------- | ------------------------ |
+| P2  | Reaction chain                   | `reaction_decreases_fuel` — chain length ≤ entity count              | well-founded recursion ✓ |
+| P6  | Agathys + Hellish Rebuke cascade | `cascade_always_terminates` — for ANY initial damage                 | `simp` ✓ (universal)     |
+| P9  | Surface element interactions     | `rewriting_terminates` — no infinite Fire↔Water loop                 | term rewriting ✓         |
+| P19 | Wet + Lightning                  | `wet_consumed_after_aoe` — Wet is a linear resource, consumed on use | Lyapunov function ✓      |
+
 
 ### II. Resource Invariants
 
 *Game resources obey conservation / monotonicity laws.*
 
-| # | Scenario | Key Theorem | Result |
-|---|----------|-------------|--------|
-| P3 | Concentration | `concentration_uniqueness` — at most one concentration spell per entity | axiom |
-| P5 | Status stacking | `ignore_preserves_existing` — Ignore StackType is idempotent | ✓ |
-| P7 | Multiclass spell slots | `esl_paladin5_sorc5 = 7` — exact ESL for all build types | `native_decide` ✓ |
-| P15 | Sorcery Point economy | `round_trip_always_lossy` — every SP↔slot cycle loses ≥1 SP | `interval_cases` ✓ (universal) |
-| P29 | Coffeelock exploit | BG3: `two_cycles_capped` — bounded at 4 extra slots. 5e RAW: `ten_cycles_thirty_slots` — **unbounded** | ✓ / ✓ |
+
+| #   | Scenario               | Key Theorem                                                                                            | Result                         |
+| --- | ---------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------ |
+| P3  | Concentration          | `concentration_uniqueness` — at most one concentration spell per entity                                | axiom                          |
+| P5  | Status stacking        | `ignore_preserves_existing` — Ignore StackType is idempotent                                           | ✓                              |
+| P7  | Multiclass spell slots | `esl_paladin5_sorc5 = 7` — exact ESL for all build types                                               | `native_decide` ✓              |
+| P15 | Sorcery Point economy  | `round_trip_always_lossy` — every SP↔slot cycle loses ≥1 SP                                            | `interval_cases` ✓ (universal) |
+| P29 | Coffeelock exploit     | BG3: `two_cycles_capped` — bounded at 4 extra slots. 5e RAW: `ten_cycles_thirty_slots` — **unbounded** | ✓ / ✓                          |
+
 
 ### III. Damage Bounds & Exact Computation
 
 *Precise damage numbers under specific builds, verified against bg3.wiki.*
 
-| # | Scenario | Key Theorem | Result |
-|---|----------|-------------|--------|
-| P1 | DRS composition | `drs_amplifies_damage` — DRS causes O((k+1)×m) scaling | `native_decide` ✓ |
-| P10 | DRS damage ceiling | `full_turn_damage` — max single-turn damage for the throwing build | `native_decide` ✓ |
-| P12 | Smite + Critical Hit | `crit_max = 127`, `crit_preserves_flat` — dice doubled, modifiers not | `native_decide` ✓ |
-| P16 | Upcast efficiency | `two_base_beats_upcast` — 2× Fireball L3 > 1× Fireball L6 | `native_decide` ✓ |
-| P17 | Dual Wield vs Two-Handed | `no_gwm_crossover_at_6` — exact STR mod where DW overtakes TH | `omega` ✓ (universal) |
+
+| #   | Scenario                 | Key Theorem                                                           | Result                |
+| --- | ------------------------ | --------------------------------------------------------------------- | --------------------- |
+| P1  | DRS composition          | `drs_amplifies_damage` — DRS causes O((k+1)×m) scaling                | `native_decide` ✓     |
+| P10 | DRS damage ceiling       | `full_turn_damage` — max single-turn damage for the throwing build    | `native_decide` ✓     |
+| P12 | Smite + Critical Hit     | `crit_max = 127`, `crit_preserves_flat` — dice doubled, modifiers not | `native_decide` ✓     |
+| P16 | Upcast efficiency        | `two_base_beats_upcast` — 2× Fireball L3 > 1× Fireball L6             | `native_decide` ✓     |
+| P17 | Dual Wield vs Two-Handed | `no_gwm_crossover_at_6` — exact STR mod where DW overtakes TH         | `omega` ✓ (universal) |
+
 
 ### IV. Action Economy Bounds
 
 *Maximum actions/attacks a character can take in one turn.*
 
-| # | Scenario | Key Theorem | Result |
-|---|----------|-------------|--------|
-| P4 | Action economy | `max_attacks_is_8`, `max_attacks_honour_is_7` | `native_decide` ✓ |
+
+| #   | Scenario                     | Key Theorem                                                | Result            |
+| --- | ---------------------------- | ---------------------------------------------------------- | ----------------- |
+| P4  | Action economy               | `max_attacks_is_8`, `max_attacks_honour_is_7`              | `native_decide` ✓ |
 | P22 | Action Surge + Haste + Thief | `global_max_is_11` — exhaustive search over all 192 builds | `native_decide` ✓ |
+
 
 ### V. Probability & Stochastic Dominance
 
 *D20 roll distributions, Markov chains, order statistics.*
 
-| # | Scenario | Key Theorem | Result |
-|---|----------|-------------|--------|
-| P8 | Concentration saves | `eb_dc_always_10` — Eldritch Blast DC floors at 10 for all d10 rolls | `omega` ✓ (universal) |
-| P14 | Advantage algebra | `combine_comm`, `combine_assoc`, `adv_idempotent` — 3-element monoid laws | `cases` ✓ (universal) |
-| P18 | Karmic Dice | `karmic_boost_over_standard` — hit rate increases from 50% to ~54.8% | Markov chain ✓ |
-| P21 | Death Saving Throws | `survival_less_than_half` — P(survive) ≈ 46.7%, not 50% | absorbing chain ✓ |
-| P25 | Bardic Inspiration | `advantage_never_beats_d6_bi` — BI(d6) ≥ advantage for ALL DCs | exhaustive ✓ |
-| P28 | Initiative first-strike | `alert_quadruples_first_strike` — Alert: 9% → 36% all-first (2v2) | order statistics ✓ |
+
+| #   | Scenario                | Key Theorem                                                               | Result                |
+| --- | ----------------------- | ------------------------------------------------------------------------- | --------------------- |
+| P8  | Concentration saves     | `eb_dc_always_10` — Eldritch Blast DC floors at 10 for all d10 rolls      | `omega` ✓ (universal) |
+| P14 | Advantage algebra       | `combine_comm`, `combine_assoc`, `adv_idempotent` — 3-element monoid laws | `cases` ✓ (universal) |
+| P18 | Karmic Dice             | `karmic_boost_over_standard` — hit rate increases from 50% to ~54.8%      | Markov chain ✓        |
+| P21 | Death Saving Throws     | `survival_less_than_half` — P(survive) ≈ 46.7%, not 50%                   | absorbing chain ✓     |
+| P25 | Bardic Inspiration      | `advantage_never_beats_d6_bi` — BI(d6) ≥ advantage for ALL DCs            | exhaustive ✓          |
+| P28 | Initiative first-strike | `alert_quadruples_first_strike` — Alert: 9% → 36% all-first (2v2)         | order statistics ✓    |
+
 
 ### VI. Game Theory & Adversarial Reasoning
 
 *Optimal play in strategic interactions between casters/combatants.*
 
-| # | Scenario | Key Theorem | Result |
-|---|----------|-------------|--------|
-| P11 | Counterspell war | `game_tree_finite` — depth ≤ number of casters | `native_decide` ✓ |
-| P23 | Twin Haste + concentration break | `break_round_2 = 0` — adversary break-even at round 2 | `native_decide` ✓ |
-| P26 | Grapple / Shove lock | `threshold_is_6` — +6 Athletics needed for 50% 3-round lock | `native_decide` ✓ |
+
+| #   | Scenario                         | Key Theorem                                                 | Result            |
+| --- | -------------------------------- | ----------------------------------------------------------- | ----------------- |
+| P11 | Counterspell war                 | `game_tree_finite` — depth ≤ number of casters              | `native_decide` ✓ |
+| P23 | Twin Haste + concentration break | `break_round_2 = 0` — adversary break-even at round 2       | `native_decide` ✓ |
+| P26 | Grapple / Shove lock             | `threshold_is_6` — +6 Athletics needed for 50% 3-round lock | `native_decide` ✓ |
+
 
 ### VII. Combinatorial Optimization
 
 *Build selection, party composition, resource scheduling — many NP-hard in general, solved exactly for BG3's small instance sizes.*
 
-| # | Scenario | Key Theorem | Result |
-|---|----------|-------------|--------|
-| P13 | Sneak Attack eligibility | `eligible_ratio = 832` — 832/2048 states allow SA (40.6%) | 2¹¹ enumeration ✓ |
-| P20 | Party composition | `minimum_cover_size_is_3` — 3 classes cover all 8 roles; 2 cannot | C(12,2) + C(12,3) ✓ |
-| P24 | Rest scheduling | `smart_beats_greedy6` — greedy short rest placement is suboptimal | counterexample ✓ |
-| P27 | Feat selection | `greedy_suboptimal` — synergies make greedy fail; GWM+PAM+Sentinel optimal | C(12,3) QUBO ✓ |
-| P30 | Wild Magic Surge | `positive_expected_value`, `high_variance` — net +EV but σ ≫ μ | statistics ✓ |
-| P31 | Healing efficiency | `healing_word_theorem` — HW > Cure Wounds for attack DPR ≥ 8 | `omega` ✓ (universal) |
-| P32 | Multiclass dip | `rogue_dip_improves_fighter` — pure builds are suboptimal | exhaustive IP ✓ |
+
+| #   | Scenario                 | Key Theorem                                                                | Result                |
+| --- | ------------------------ | -------------------------------------------------------------------------- | --------------------- |
+| P13 | Sneak Attack eligibility | `eligible_ratio = 832` — 832/2048 states allow SA (40.6%)                  | 2¹¹ enumeration ✓     |
+| P20 | Party composition        | `minimum_cover_size_is_3` — 3 classes cover all 8 roles; 2 cannot          | C(12,2) + C(12,3) ✓   |
+| P24 | Rest scheduling          | `smart_beats_greedy6` — greedy short rest placement is suboptimal          | counterexample ✓      |
+| P27 | Feat selection           | `greedy_suboptimal` — synergies make greedy fail; GWM+PAM+Sentinel optimal | C(12,3) QUBO ✓        |
+| P30 | Wild Magic Surge         | `positive_expected_value`, `high_variance` — net +EV but σ ≫ μ             | statistics ✓          |
+| P31 | Healing efficiency       | `healing_word_theorem` — HW > Cure Wounds for attack DPR ≥ 8               | `omega` ✓ (universal) |
+| P32 | Multiclass dip           | `rogue_dip_improves_fighter` — pure builds are suboptimal                  | exhaustive IP ✓       |
+
 
 ---
 
@@ -134,23 +150,27 @@ Every `theorem` in this repository is a proof term type-checked by the Lean 4 ke
 
 All proofs reduce to the Lean 4 kernel plus these axioms (verifiable via `#print axioms`):
 
-| Axiom | Source | Notes |
-|-------|--------|-------|
-| `propext` | Lean 4 core | Propositional extensionality |
-| `Quot.sound` | Lean 4 core | Quotient soundness |
-| `Classical.choice` | Lean 4 core | Used by `simp` tactic |
+
+| Axiom               | Source          | Notes                                          |
+| ------------------- | --------------- | ---------------------------------------------- |
+| `propext`           | Lean 4 core     | Propositional extensionality                   |
+| `Quot.sound`        | Lean 4 core     | Quotient soundness                             |
+| `Classical.choice`  | Lean 4 core     | Used by `simp` tactic                          |
 | `Lean.ofReduceBool` | `native_decide` | Trusts compiled reduction; same TCB as mathlib |
+
 
 No scenario in `Scenarios/` introduces custom `axiom` declarations. The axioms in `Axioms/BG3Rules.lean` (P1–P5) are isolated formalization targets for the LLM pipeline and are **not** imported by any scenario file.
 
 ### Proof Techniques: What Counts as What
 
-| Technique | What it proves | Example |
-|-----------|---------------|---------|
-| `native_decide` over enumerated domain | **Exhaustive model checking**: all states checked, proof certificate generated | P13: all 2048 Boolean states, P22: all 192 builds |
-| `native_decide` on concrete values | **Verified computation**: specific instance confirmed | P12: `crit_max = 127` |
-| `omega`, `simp`, `cases` | **Structural proof**: holds for ALL inputs (universally quantified) | P6: `cascade_always_terminates`, P17: `no_gwm_dw_wins_above_6` |
-| `sorry` | **Open problem**: stated but not proved, clearly marked | P7: `esl_le_total_level`, P8: `small_hits_safer` |
+
+| Technique                              | What it proves                                                                 | Example                                                        |
+| -------------------------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------- |
+| `native_decide` over enumerated domain | **Exhaustive model checking**: all states checked, proof certificate generated | P13: all 2048 Boolean states, P22: all 192 builds              |
+| `native_decide` on concrete values     | **Verified computation**: specific instance confirmed                          | P12: `crit_max = 127`                                          |
+| `omega`, `simp`, `cases`               | **Structural proof**: holds for ALL inputs (universally quantified)            | P6: `cascade_always_terminates`, P17: `no_gwm_dw_wins_above_6` |
+| `sorry`                                | **Open problem**: stated but not proved, clearly marked                        | P7: `esl_le_total_level`, P8: `small_hits_safer`               |
+
 
 Concretely: 11 of 27 scenarios contain at least one universally quantified theorem proved by structural tactics (not `native_decide`). The remaining use exhaustive enumeration over finite domains, which is a standard verified model-checking technique.
 
@@ -158,11 +178,13 @@ Concretely: 11 of 27 scenarios contain at least one universally quantified theor
 
 The Lean model encodes rules from [bg3.wiki](https://bg3.wiki), not the game binary. This creates a potential gap:
 
-| Layer | What it trusts | How the gap is addressed |
-|-------|---------------|--------------------------|
-| Lean model | bg3.wiki is correct | In-game oracle validates predictions against real game engine |
-| bg3.wiki | Community reverse-engineering | Cross-referenced with game files; wiki has >10k editors |
-| In-game oracle | BG3 Script Extender API | SE is the standard modding framework, used by the modding community |
+
+| Layer          | What it trusts                | How the gap is addressed                                            |
+| -------------- | ----------------------------- | ------------------------------------------------------------------- |
+| Lean model     | bg3.wiki is correct           | In-game oracle validates predictions against real game engine       |
+| bg3.wiki       | Community reverse-engineering | Cross-referenced with game files; wiki has >10k editors             |
+| In-game oracle | BG3 Script Extender API       | SE is the standard modding framework, used by the modding community |
+
 
 The CEGAR loop is designed to close this gap iteratively: when the oracle diverges from the model, the divergence is fed back as a correction. The current `v0.1-alpha` provides the Lean verification layer; the oracle integration is functional but requires manual game interaction.
 
@@ -268,7 +290,7 @@ src/
   3_engine_bridge/       Python: Lean output → Lua scripts → log analysis
   4_ingame_oracle/       Lua: BG3 Script Extender mod
 eval/                    Feedback loop orchestrator + metric collection
-tests/                   23 pytest tests for the Python layer
+tests/                   55 pytest tests (models, parser, DB, engine bridge)
 dataset/                 Raw wiki dumps + manual annotation benchmarks
 ```
 

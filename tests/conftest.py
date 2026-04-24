@@ -1,6 +1,6 @@
 """
-Load ``src/1_auto_formalizer`` as importable package ``auto_formalizer``
-(digit-prefixed directory name is not a valid Python module identifier).
+Register ``src/1_auto_formalizer`` and ``src/3_engine_bridge`` as importable
+packages despite their digit-prefixed directory names.
 """
 
 from __future__ import annotations
@@ -13,25 +13,40 @@ from pathlib import Path
 import pytest
 
 _ROOT = Path(__file__).resolve().parents[1]
-_FORM = _ROOT / "src" / "1_auto_formalizer"
+
+_PACKAGES: dict[str, tuple[Path, list[tuple[str, str]]]] = {
+    "auto_formalizer": (
+        _ROOT / "src" / "1_auto_formalizer",
+        [
+            ("models", "models.py"),
+            ("wikitext_parser", "wikitext_parser.py"),
+            ("database", "database.py"),
+        ],
+    ),
+    "engine_bridge": (
+        _ROOT / "src" / "3_engine_bridge",
+        [
+            ("lean_parser", "lean_parser.py"),
+            ("lua_generator", "lua_generator.py"),
+            ("log_analyzer", "log_analyzer.py"),
+        ],
+    ),
+}
 
 
 def pytest_configure(config: pytest.Config) -> None:
-    pkg = types.ModuleType("auto_formalizer")
-    pkg.__path__ = [str(_FORM)]  # type: ignore[attr-defined]
-    sys.modules["auto_formalizer"] = pkg
+    for pkg_name, (pkg_dir, submodules) in _PACKAGES.items():
+        pkg = types.ModuleType(pkg_name)
+        pkg.__path__ = [str(pkg_dir)]  # type: ignore[attr-defined]
+        sys.modules[pkg_name] = pkg
 
-    for sub, fname in (
-        ("models", "models.py"),
-        ("wikitext_parser", "wikitext_parser.py"),
-        ("database", "database.py"),
-    ):
-        full = f"auto_formalizer.{sub}"
-        if full in sys.modules and getattr(sys.modules[full], "__file__", None):
-            continue
-        spec = importlib.util.spec_from_file_location(full, _FORM / fname)
-        assert spec and spec.loader
-        mod = importlib.util.module_from_spec(spec)
-        mod.__package__ = "auto_formalizer"
-        sys.modules[full] = mod
-        spec.loader.exec_module(mod)
+        for sub, fname in submodules:
+            full = f"{pkg_name}.{sub}"
+            if full in sys.modules and getattr(sys.modules[full], "__file__", None):
+                continue
+            spec = importlib.util.spec_from_file_location(full, pkg_dir / fname)
+            assert spec and spec.loader
+            mod = importlib.util.module_from_spec(spec)
+            mod.__package__ = pkg_name
+            sys.modules[full] = mod
+            spec.loader.exec_module(mod)
