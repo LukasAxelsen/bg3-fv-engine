@@ -245,3 +245,86 @@ def analyze_log(log_path: Path, expected_path: CounterexamplePath) -> Divergence
         observed="",
         axiom_name=axiom,
     )
+
+
+# ── CLI ────────────────────────────────────────────────────────────────────
+
+
+def _build_argparser() -> "argparse.ArgumentParser":  # pragma: no cover
+    import argparse
+
+    p = argparse.ArgumentParser(
+        prog="log_analyzer",
+        description=(
+            "Compare an oracle JSONL log to a Lean prediction. In counterexample "
+            "mode (--expected) checks step-by-step alignment; in probability mode "
+            "(--scenario) checks empirical pass-rate vs. the registered theoretical "
+            "probability."
+        ),
+    )
+    p.add_argument("--log", type=Path, required=True, help="JSONL log produced by the oracle.")
+    p.add_argument(
+        "--expected",
+        type=Path,
+        help="JSON file with the predicted CounterexamplePath ({steps:[...], axiom_name}).",
+    )
+    p.add_argument("--scenario", type=str, help="Registered probability scenario name.")
+    p.add_argument(
+        "--expect",
+        type=float,
+        help="Override the scenario's theoretical probability.",
+    )
+    p.add_argument(
+        "--tolerance",
+        type=float,
+        default=0.04,
+        help="Allowed |empirical − theoretical| (default 0.04).",
+    )
+    return p
+
+
+def _cli_main(argv: list[str] | None = None) -> int:  # pragma: no cover
+    args = _build_argparser().parse_args(argv)
+
+    if args.scenario:
+        try:
+            from .probability_scenarios import analyze_probability_log, get_scenario
+        except ImportError:
+            from probability_scenarios import analyze_probability_log, get_scenario  # type: ignore[no-redef]
+        sc = get_scenario(args.scenario)
+        result = analyze_probability_log(
+            args.log, sc, tolerance=args.tolerance, expected_override=args.expect
+        )
+        print(result.summary())
+        return 0 if result.agree else 1
+
+    if args.expected:
+        try:
+            from .lean_parser import CounterexamplePath, CounterexampleStep
+        except ImportError:
+            from lean_parser import CounterexamplePath, CounterexampleStep  # type: ignore[no-redef]
+        payload = json.loads(args.expected.read_text(encoding="utf-8"))
+        steps_payload = payload.get("steps") or []
+        steps = [
+            CounterexampleStep(state=s.get("state", {}), event=s.get("event", {}))
+            for s in steps_payload
+            if isinstance(s, Mapping)
+        ]
+        path = CounterexamplePath(
+            steps=steps,
+            axiom_name=payload.get("axiom_name") or payload.get("axiom"),
+            metadata={k: v for k, v in payload.items() if k not in {"steps"}},
+        )
+        report = analyze_log(args.log, path)
+        print(
+            f"{report.divergence_type.value.upper()}: step={report.step_index} "
+            f"axiom={report.axiom_name} expected={report.expected} observed={report.observed}"
+        )
+        return 0 if report.divergence_type == DivergenceType.ALIGNED else 1
+
+    print("error: provide either --scenario or --expected.", flush=True)
+    return 2
+
+
+if __name__ == "__main__":  # pragma: no cover
+    raise SystemExit(_cli_main())

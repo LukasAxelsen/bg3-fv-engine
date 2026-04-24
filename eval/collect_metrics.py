@@ -152,6 +152,69 @@ def export_booktabs_summary(summary: dict[str, Any], out_path: Path) -> None:
     out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def load_llm_eval_report(path: Optional[Path]) -> Optional[dict[str, Any]]:
+    """Load an ``llm_to_lean --mode eval --out-json …`` report if present."""
+    if path is None or not path.is_file():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def fold_llm_eval_into_summary(
+    summary: dict[str, Any], report: Optional[dict[str, Any]]
+) -> dict[str, Any]:
+    """Add the LLM accuracy fields (provider/model/micro/macro/n) to ``summary``."""
+    if not report:
+        return summary
+    summary = {**summary}
+    summary["llm_provider"] = report.get("provider", "unknown")
+    summary["llm_model"] = report.get("model", "")
+    summary["llm_n_entries"] = report.get("n_entries", 0)
+    summary["llm_total_facts"] = report.get("total_facts", 0)
+    summary["llm_correct_facts"] = report.get("correct_facts", 0)
+    summary["llm_micro_accuracy"] = report.get("micro_accuracy", 0.0)
+    summary["llm_macro_accuracy"] = report.get("macro_accuracy", 0.0)
+    return summary
+
+
+def export_llm_accuracy_table(report: Optional[dict[str, Any]], out_path: Path) -> None:
+    """LaTeX booktabs table with one row per gold entry's per-entry accuracy."""
+    if not report:
+        return
+    rows = report.get("entries", [])
+    if not rows:
+        return
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        r"\begin{tabular}{llrrr}",
+        r"\toprule",
+        r"Spell & ID & \#facts & Correct & Accuracy \\",
+        r"\midrule",
+    ]
+    for r in rows:
+        total = r.get("total_facts", 0)
+        correct = r.get("correct_facts", 0)
+        acc = (correct / total) if total else 1.0
+        lines.append(
+            f"{r.get('spell_name', '?')} & {r.get('entry_id', '?')} & {total} & {correct} & {acc:.3f} \\\\"
+        )
+    lines.extend(
+        [
+            r"\midrule",
+            (
+                f"\\textbf{{Total}} & & {report.get('total_facts', 0)} & "
+                f"{report.get('correct_facts', 0)} & "
+                f"{report.get('micro_accuracy', 0.0):.3f} \\\\"
+            ),
+            r"\bottomrule",
+            r"\end{tabular}",
+        ]
+    )
+    out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     p = argparse.ArgumentParser(description="Build paper figures from feedback-loop results.")
     p.add_argument("--results", type=Path, default=_repo_root() / "results")
@@ -162,10 +225,22 @@ def main(argv: Optional[list[str]] = None) -> int:
         default=None,
         help="Optional evaluate_accuracy JSON for complexity-tier figure",
     )
+    p.add_argument(
+        "--llm-eval-json",
+        type=Path,
+        default=None,
+        help=(
+            "Optional report from `llm_to_lean --mode eval --out-json …`. "
+            "When present, accuracy fields are folded into metrics_summary.json "
+            "and a LaTeX accuracy table is exported."
+        ),
+    )
     args = p.parse_args(argv)
 
     rows = load_round_metrics(args.results)
     summary = summarize(rows)
+    llm_report = load_llm_eval_report(args.llm_eval_json)
+    summary = fold_llm_eval_into_summary(summary, llm_report)
 
     out = args.output
     plot_convergence(rows, out / "fig_convergence.png")
@@ -173,6 +248,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     plot_accuracy_by_tier(args.eval_json, out / "fig_accuracy_by_tier.png")
 
     export_booktabs_summary(summary, out / "table_metrics.tex")
+    export_llm_accuracy_table(llm_report, out / "table_llm_accuracy.tex")
 
     meta = {**summary}
     (out / "metrics_summary.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")

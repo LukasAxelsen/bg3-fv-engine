@@ -21,6 +21,9 @@ _PACKAGES: dict[str, tuple[Path, list[tuple[str, str]]]] = {
             ("models", "models.py"),
             ("wikitext_parser", "wikitext_parser.py"),
             ("database", "database.py"),
+            ("drs_lean_export", "drs_lean_export.py"),
+            ("llm_providers", "llm_providers.py"),
+            ("llm_eval", "llm_eval.py"),
         ],
     ),
     "engine_bridge": (
@@ -29,6 +32,7 @@ _PACKAGES: dict[str, tuple[Path, list[tuple[str, str]]]] = {
             ("lean_parser", "lean_parser.py"),
             ("lua_generator", "lua_generator.py"),
             ("log_analyzer", "log_analyzer.py"),
+            ("probability_scenarios", "probability_scenarios.py"),
         ],
     ),
 }

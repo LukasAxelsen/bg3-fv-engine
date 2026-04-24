@@ -1,0 +1,59 @@
+{
+  "_provenance": {
+    "purpose": "Single source of truth linking each axiom in src/2_fv_core/Axioms/BG3Rules.lean to (a) the bg3.wiki page that documents the underlying mechanic and (b) the dice / damage-type constants that the axiom references. Edited by hand when an axiom changes; checked by tests/test_axiom_provenance.py to prevent the Lean axioms from silently drifting from the wiki.",
+    "scope": "Only axioms that reference numeric constants (dice, slot levels, ability checks). Axioms that purely encode rule shapes (e.g. concentration_uniqueness) are listed for traceability without numeric checks.",
+    "extraction_date": "2026-04-25"
+  },
+  "axioms": [
+    {
+      "axiom_name": "fireball_damage",
+      "spell_name": "Fireball",
+      "wiki_url": "https://bg3.wiki/wiki/Fireball",
+      "dice": {"count": 8, "sides": 6, "bonus": 0},
+      "damage_type": "Fire",
+      "lean_dice_pattern": "DamageRoll.mk ⟨8, 6, 0⟩ .fire",
+      "notes": "8d6 Fire, DEX save for half, 18m range, 4m radius AoE."
+    },
+    {
+      "axiom_name": "hellish_rebuke_trigger",
+      "spell_name": "Hellish Rebuke",
+      "wiki_url": "https://bg3.wiki/wiki/Hellish_Rebuke",
+      "dice": {"count": 2, "sides": 10, "bonus": 0},
+      "damage_type": "Fire",
+      "lean_dice_pattern": "⟨⟨2, 10, 0⟩, .fire⟩",
+      "notes": "Reaction; 2d10 Fire on the attacker after taking damage."
+    },
+    {
+      "axiom_name": "hex_crit_bug",
+      "spell_name": "Hex",
+      "wiki_url": "https://bg3.wiki/wiki/Hex",
+      "dice_normal": {"count": 1, "sides": 6, "bonus": 0},
+      "dice_crit":   {"count": 2, "sides": 6, "bonus": 0},
+      "damage_type": "Necrotic",
+      "lean_dice_pattern_normal": "DamageRoll.mk ⟨1, 6, 0⟩ .necrotic",
+      "lean_dice_pattern_crit":   "DamageRoll.mk ⟨2, 6, 0⟩ .necrotic",
+      "notes": "1d6 Necrotic per hit, doubled on crit (the bug)."
+    },
+    {
+      "axiom_name": "concentration_uniqueness",
+      "spell_name": "(general rule)",
+      "wiki_url": "https://bg3.wiki/wiki/Concentration",
+      "lean_dice_pattern": null,
+      "notes": "Structural rule, no numeric constants."
+    },
+    {
+      "axiom_name": "haste_self_cast_bug",
+      "spell_name": "Haste",
+      "wiki_url": "https://bg3.wiki/wiki/Haste",
+      "lean_dice_pattern": null,
+      "notes": "Structural rule, no numeric constants. The bug: casting a second concentration spell while concentrating on Haste applies Lethargic."
+    },
+    {
+      "axiom_name": "counterspell_uses_intelligence",
+      "spell_name": "Counterspell",
+      "wiki_url": "https://bg3.wiki/wiki/Counterspell",
+      "lean_dice_pattern": null,
+      "notes": "Structural rule. The Lean axiom intentionally drops the DC formula so the in-game oracle can probe whether BG3 uses INT (the bug) or the spellcasting ability (RAW)."
+    }
+  ]
+}

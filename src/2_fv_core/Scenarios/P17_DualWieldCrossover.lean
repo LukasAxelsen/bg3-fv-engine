@@ -93,11 +93,12 @@ theorem str5_max : dualWieldMaxDPR 5 = 33 ∧ twoHandedMaxDPR 5 = 54 := by nativ
 /-- Without GWM at STR 10 (+0): TH = 2 × 12 = 24, DW = 3 × 6 = 18. -/
 theorem str0_no_gwm : twoHandedBaseMaxDPR 0 = 24 ∧ dualWieldMaxDPR 0 = 18 := by native_decide
 
-/-- Two-Handed (with GWM) always beats Dual Wield in max DPR for STR ≥ 0.
+/-- Two-Handed (with GWM) always beats Dual Wield in max DPR for STR ≤ 10.
     TH = 2(12 + s + 10) = 44 + 2s.  DW = 3(6 + s) = 18 + 3s.
     TH > DW iff 44 + 2s > 18 + 3s iff 26 > s.  So for s < 26 (always in BG3). -/
 theorem two_handed_gwm_always_wins (strMod : Nat) (h : strMod ≤ 10) :
-    twoHandedMaxDPR strMod > dualWieldMaxDPR strMod := by omega
+    twoHandedMaxDPR strMod > dualWieldMaxDPR strMod := by
+  unfold twoHandedMaxDPR dualWieldMaxDPR; omega
 
 /-- Without GWM: TH = 24 + 2s, DW = 18 + 3s.  TH > DW iff s < 6.
     At STR 22 (+6), Dual Wield ties! -/
@@ -105,10 +106,12 @@ theorem no_gwm_crossover_at_6 :
     twoHandedBaseMaxDPR 6 = dualWieldMaxDPR 6 := by native_decide
 
 theorem no_gwm_th_wins_below_6 (s : Nat) (h : s < 6) :
-    twoHandedBaseMaxDPR s > dualWieldMaxDPR s := by omega
+    twoHandedBaseMaxDPR s > dualWieldMaxDPR s := by
+  unfold twoHandedBaseMaxDPR dualWieldMaxDPR; omega
 
 theorem no_gwm_dw_wins_above_6 (s : Nat) (h : s > 6) :
-    dualWieldMaxDPR s > twoHandedBaseMaxDPR s := by omega
+    dualWieldMaxDPR s > twoHandedBaseMaxDPR s := by
+  unfold twoHandedBaseMaxDPR dualWieldMaxDPR; omega
 
 -- ── Expected hit probability and true DPR ───────────────────────────────
 
@@ -126,13 +129,16 @@ def hitProb20 (toHitBonus targetAC : Nat) : Nat :=
 theorem gwm_hit_penalty :
     hitProb20 8 16 = 13 ∧ hitProb20 3 16 = 8 := by native_decide
 
-/-- **OPEN (P17a)**: Compute the full expected DPR as a function of
-    (STR, target AC, weapon enchantment) and find the exact surface
-    where TH-GWM = DW in expected damage.  This requires modeling
-    hit probability × expected damage per hit for each attack. -/
+/-! ## Open problems
 
-/-- **OPEN (P17b)**: With Berserker Barbarian's Frenzy (extra bonus action
-    attack), Dual Wield loses its 3rd-attack advantage.  Prove that
-    Frenzy + Two-Handed strictly dominates Dual Wield for all STR ≥ 3. -/
+**P17a.** Compute the full expected DPR as a function of `(STR, targetAC,
+weaponEnchantment)` and find the exact surface where TH-GWM = DW in
+expected damage.  Requires modelling hit probability × expected damage per
+hit for each attack.
+
+**P17b.** With Berserker Barbarian's Frenzy (extra bonus-action attack),
+Dual Wield loses its 3rd-attack advantage.  Prove that Frenzy + Two-Handed
+strictly dominates Dual Wield for all STR ≥ 3.
+-/
 
 end VALOR.Scenarios.P17

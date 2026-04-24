@@ -84,10 +84,14 @@ def fighter11Thief3 : Build :=
 def multiclass_fighter_berserker_thief : Build :=
   ⟨1, true, true, true, true, false⟩
 
-/-- The "kitchen sink" build: Fighter 11 + Haste + Crossbow Expert + Thief.
-    This requires multiclassing into Thief at the cost of Fighter 12. -/
+/-- The "kitchen sink" build: Fighter 11 + Berserker 3 (Frenzy) + Thief 3 +
+    Crossbow Expert + Haste + Action Surge.  Every attack-multiplier source
+    enabled.  Note: the original draft of this file omitted Frenzy and
+    therefore mis-claimed `maxAttacks = 11` — the correct value is 10 for
+    that build (since `bonusAttacks = min(1, 2) = 1`).  We restore Frenzy
+    so the kitchen-sink moniker actually reaches the global ceiling. -/
 def kitchenSink : Build :=
-  ⟨2, true, true, false, true, true⟩
+  ⟨2, true, true, true, true, true⟩
 
 -- ── Verified properties ─────────────────────────────────────────────────
 
@@ -106,15 +110,21 @@ theorem multiclass_attacks :
 
 -- ── Global upper bound ──────────────────────────────────────────────────
 
-/-- All possible builds (2^6 × 3 = 192 combinations). -/
-def allBuilds : List Build :=
-  do
-    let ea ← [0, 1, 2]
-    let as_ ← [true, false]; let h ← [true, false]
-    let f ← [true, false]; let t ← [true, false]; let cb ← [true, false]
-    pure ⟨ea, as_, h, f, t, cb⟩
+/-- All possible builds: 3 Extra Attack tiers × 2⁵ booleans = 96 combinations.
+    The original draft incorrectly claimed 192 (2⁶ × 3), conflating the count
+    of booleans (5) with the count of feature flags including the tier (6). -/
+def allBuilds : List Build := Id.run do
+  let mut acc : List Build := []
+  for ea in [0, 1, 2] do
+    for as_ in [true, false] do
+      for h in [true, false] do
+        for f in [true, false] do
+          for t in [true, false] do
+            for cb in [true, false] do
+              acc := ⟨ea, as_, h, f, t, cb⟩ :: acc
+  return acc
 
-theorem total_builds : allBuilds.length = 192 := by native_decide
+theorem total_builds : allBuilds.length = 96 := by native_decide
 
 def globalMax : Nat :=
   allBuilds.foldl (fun acc b => max acc (maxAttacks b)) 0
@@ -126,11 +136,13 @@ theorem global_max_is_11 : globalMax = 11 := by native_decide
 theorem no_build_exceeds_11 :
     allBuilds.all (fun b => maxAttacks b ≤ 11) = true := by native_decide
 
-/-- Exactly how many builds achieve the maximum? -/
+/-- Exactly how many builds achieve the maximum?  With the corrected
+    arithmetic, only one build hits 11 attacks: every flag must be true and
+    the Extra Attack tier must be 2 (Fighter 11). -/
 def optimalBuildCount : Nat :=
   (allBuilds.filter (fun b => maxAttacks b == 11)).length
 
-theorem four_optimal_builds : optimalBuildCount = 4 := by native_decide
+theorem unique_optimal_build : optimalBuildCount = 1 := by native_decide
 
 -- ── Damage output comparison ────────────────────────────────────────────
 
@@ -138,19 +150,17 @@ theorem four_optimal_builds : optimalBuildCount = 4 := by native_decide
 theorem max_weapon_damage :
     11 * (12 + 5) = 187 := by native_decide
 
-/-- Comparison: the P10 DRS throw build does more damage per throw but
-    fewer total attacks.  This establishes the trade-off between
-    attack count and per-attack damage amplification. -/
+/-! ## Open problems
 
-/-- **OPEN (P22a)**: With Eldritch Blast at Level 17+ (4 beams), does
-    a Warlock with Haste + Quickened EB exceed 11 "attack" instances?
-    EB is not an Attack action, so it may bypass the attack count limit.
-    This requires modeling EB as separate from the Attack action.
+**P22a.** With Eldritch Blast at Level 17+ (4 beams), does a Warlock with
+Haste + Quickened EB exceed 11 "attack" instances?  EB is not an Attack
+action, so it may bypass the attack count limit.  Requires modelling EB
+as separate from the Attack action.
 
-    **OPEN (P22b)**: Prove that for any build with N attacks and
-    damage-per-attack D, the maximum turn DPR = N × D is achieved by
-    the build that maximizes the product — not necessarily the build
-    with the most attacks.  This is a Lagrange multiplier argument
-    subject to the 12-level budget constraint. -/
+**P22b.** Prove that for any build with N attacks and damage-per-attack D,
+the maximum turn DPR = N · D is achieved by the build that maximises the
+product — not necessarily the one with the most attacks.  This is a
+Lagrange-multiplier argument subject to the 12-level budget constraint.
+-/
 
 end VALOR.Scenarios.P22

@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from .models import CrawlRecord, Spell
+from .models import CrawlRecord, DRSItem, Spell
 
 
 _DEFAULT_DB_PATH = Path(__file__).resolve().parents[2] / "dataset" / "valor.db"
@@ -78,6 +78,18 @@ class SpellDB:
                 success      INTEGER NOT NULL,
                 errors_json  TEXT,
                 crawled_at   TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS drs_items (
+                name                  TEXT PRIMARY KEY,
+                wiki_url              TEXT NOT NULL,
+                layer_kind            TEXT NOT NULL,
+                rider_dice            TEXT,
+                damage_type           TEXT,
+                honour_demotes_to_dr  INTEGER NOT NULL DEFAULT 0,
+                source_category       TEXT,
+                notes                 TEXT,
+                crawled_at            TEXT NOT NULL
             );
         """)
         self._conn.commit()
@@ -220,6 +232,55 @@ class SpellDB:
             "SELECT * FROM spells WHERE casting_resource = 'Reaction' ORDER BY name"
         ).fetchall()
         return [dict(r) for r in rows]
+
+    # ── DRS items ─────────────────────────────────────────────────────
+
+    def upsert_drs_item(self, item: DRSItem) -> None:
+        now = datetime.now(timezone.utc).isoformat()
+        self._conn.execute(
+            """
+            INSERT INTO drs_items (
+                name, wiki_url, layer_kind, rider_dice, damage_type,
+                honour_demotes_to_dr, source_category, notes, crawled_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(name) DO UPDATE SET
+                wiki_url=excluded.wiki_url,
+                layer_kind=excluded.layer_kind,
+                rider_dice=excluded.rider_dice,
+                damage_type=excluded.damage_type,
+                honour_demotes_to_dr=excluded.honour_demotes_to_dr,
+                source_category=excluded.source_category,
+                notes=excluded.notes,
+                crawled_at=excluded.crawled_at
+            """,
+            (
+                item.name,
+                item.wiki_url,
+                item.layer_kind.value,
+                item.rider_dice.raw if item.rider_dice else None,
+                item.damage_type.value if item.damage_type else None,
+                int(item.honour_demotes_to_dr),
+                item.source_category,
+                item.notes,
+                now,
+            ),
+        )
+        self._conn.commit()
+
+    def list_drs_items(self, layer_kind: Optional[str] = None) -> list[dict]:
+        if layer_kind is not None:
+            rows = self._conn.execute(
+                "SELECT * FROM drs_items WHERE layer_kind = ? ORDER BY name",
+                (layer_kind,),
+            ).fetchall()
+        else:
+            rows = self._conn.execute(
+                "SELECT * FROM drs_items ORDER BY layer_kind, name"
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def count_drs_items(self) -> int:
+        return self._conn.execute("SELECT COUNT(*) FROM drs_items").fetchone()[0]
 
     # ── Lifecycle ─────────────────────────────────────────────────────
 

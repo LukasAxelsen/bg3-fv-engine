@@ -1,0 +1,154 @@
+{
+  "_provenance": {
+    "source_url": "https://bg3.wiki/wiki/Damage_Mechanics",
+    "source_section": "DRS effects",
+    "extraction_date": "2026-04-25",
+    "notes": [
+      "Hand-curated seed list. Each entry is verifiable against the wiki section linked above.",
+      "All entries are documented as DRS in non-Honour modes and demoted to plain DR in Honour mode (per the Patch 5 changes called out in the wiki).",
+      "Re-generate src/2_fv_core/Axioms/DRSItems.lean from this file via: python3 -m src.1_auto_formalizer.drs_lean_export"
+    ]
+  },
+  "items": [
+    {
+      "name": "Lightning Jabber (thrown bonus)",
+      "wiki_url": "https://bg3.wiki/wiki/Lightning_Jabber",
+      "layer_kind": "DRS",
+      "rider_dice": {"count": 1, "sides": 4, "bonus": 0, "raw": "1d4"},
+      "damage_type": "Lightning",
+      "honour_demotes_to_dr": true,
+      "source_category": "weapon",
+      "notes": "1d4 Lightning when thrown; treated as a Source so all Riders re-apply."
+    },
+    {
+      "name": "Arrow of Acid (rider)",
+      "wiki_url": "https://bg3.wiki/wiki/Arrow_of_Acid",
+      "layer_kind": "DRS",
+      "rider_dice": {"count": 2, "sides": 4, "bonus": 0, "raw": "2d4"},
+      "damage_type": "Acid",
+      "honour_demotes_to_dr": true,
+      "source_category": "consumable",
+      "notes": "Adds 2d4 Acid; creates a permanent Acid surface."
+    },
+    {
+      "name": "Arrow of Fire (rider)",
+      "wiki_url": "https://bg3.wiki/wiki/Arrow_of_Fire",
+      "layer_kind": "DRS",
+      "rider_dice": {"count": 2, "sides": 4, "bonus": 0, "raw": "2d4"},
+      "damage_type": "Fire",
+      "honour_demotes_to_dr": true,
+      "source_category": "consumable",
+      "notes": "Adds 2d4 Fire; creates a Fire surface for 2 turns."
+    },
+    {
+      "name": "Arrow of Ice (rider)",
+      "wiki_url": "https://bg3.wiki/wiki/Arrow_of_Ice",
+      "layer_kind": "DRS",
+      "rider_dice": {"count": 2, "sides": 4, "bonus": 0, "raw": "2d4"},
+      "damage_type": "Cold",
+      "honour_demotes_to_dr": true,
+      "source_category": "consumable",
+      "notes": "Adds 2d4 Cold; creates an Ice surface for 2 turns."
+    },
+    {
+      "name": "Arrow of Lightning (rider)",
+      "wiki_url": "https://bg3.wiki/wiki/Arrow_of_Lightning",
+      "layer_kind": "DRS",
+      "rider_dice": {"count": 2, "sides": 4, "bonus": 0, "raw": "2d4"},
+      "damage_type": "Lightning",
+      "honour_demotes_to_dr": true,
+      "source_category": "consumable",
+      "notes": "Adds 2d4 Lightning."
+    },
+    {
+      "name": "Sword of Life Stealing (crit)",
+      "wiki_url": "https://bg3.wiki/wiki/Sword_of_Life_Stealing",
+      "layer_kind": "DRS",
+      "rider_dice": null,
+      "damage_type": "Necrotic",
+      "honour_demotes_to_dr": true,
+      "source_category": "weapon",
+      "notes": "Flat 10 Necrotic on crit (versus non-construct/undead)."
+    },
+    {
+      "name": "Craterflesh Gloves: Craterous Wounds (crit)",
+      "wiki_url": "https://bg3.wiki/wiki/Craterflesh_Gloves",
+      "layer_kind": "DRS",
+      "rider_dice": {"count": 1, "sides": 6, "bonus": 0, "raw": "1d6"},
+      "damage_type": "Force",
+      "honour_demotes_to_dr": true,
+      "source_category": "armour",
+      "notes": "Crit-rider; 1d6 Force on each Critical Hit."
+    },
+    {
+      "name": "Crimson Mischief: Redvein Savagery",
+      "wiki_url": "https://bg3.wiki/wiki/Crimson_Mischief",
+      "layer_kind": "DRS",
+      "rider_dice": null,
+      "damage_type": "Piercing",
+      "honour_demotes_to_dr": true,
+      "source_category": "weapon",
+      "notes": "Flat 7 Piercing on attacks made with advantage (main-hand only)."
+    },
+    {
+      "name": "Render of Mind and Body: Psychic Steel Virtuoso",
+      "wiki_url": "https://bg3.wiki/wiki/Render_of_Mind_and_Body",
+      "layer_kind": "DRS",
+      "rider_dice": {"count": 1, "sides": 8, "bonus": 0, "raw": "1d8"},
+      "damage_type": "Psychic",
+      "honour_demotes_to_dr": true,
+      "source_category": "weapon",
+      "notes": "Adds 1d8 Psychic when attacking with advantage (only on the weapon itself)."
+    },
+    {
+      "name": "Rat Bat (unnamed ability)",
+      "wiki_url": "https://bg3.wiki/wiki/Rat_Bat",
+      "layer_kind": "DRS",
+      "rider_dice": {"count": 1, "sides": 6, "bonus": 0, "raw": "1d6"},
+      "damage_type": "Piercing",
+      "honour_demotes_to_dr": true,
+      "source_category": "weapon",
+      "notes": "Adds 1d6 Piercing to all regular attacks; DRS even though the base is Bludgeoning."
+    },
+    {
+      "name": "Punch-Drunk Bastard: Tippler's Rage",
+      "wiki_url": "https://bg3.wiki/wiki/Punch-Drunk_Bastard",
+      "layer_kind": "DRS",
+      "rider_dice": {"count": 1, "sides": 4, "bonus": 0, "raw": "1d4"},
+      "damage_type": "Thunder",
+      "honour_demotes_to_dr": true,
+      "source_category": "weapon",
+      "notes": "Each attack adds 1d4 Thunder under the Alcohol condition."
+    },
+    {
+      "name": "Nyrulna: Zephyr Connection (thrown blast)",
+      "wiki_url": "https://bg3.wiki/wiki/Nyrulna",
+      "layer_kind": "DRS",
+      "rider_dice": {"count": 3, "sides": 4, "bonus": 0, "raw": "3d4"},
+      "damage_type": "Thunder",
+      "honour_demotes_to_dr": true,
+      "source_category": "weapon",
+      "notes": "Thrown explosion: 3d4 Thunder in 6m blast."
+    },
+    {
+      "name": "Hex (Warlock spell rider)",
+      "wiki_url": "https://bg3.wiki/wiki/Hex",
+      "layer_kind": "DR",
+      "rider_dice": {"count": 1, "sides": 6, "bonus": 0, "raw": "1d6"},
+      "damage_type": "Necrotic",
+      "honour_demotes_to_dr": false,
+      "source_category": "spell",
+      "notes": "Pure Damage Rider; never a Source. Listed for completeness."
+    },
+    {
+      "name": "Ring of Flinging (rider)",
+      "wiki_url": "https://bg3.wiki/wiki/Ring_of_Flinging",
+      "layer_kind": "DR",
+      "rider_dice": {"count": 1, "sides": 4, "bonus": 0, "raw": "1d4"},
+      "damage_type": "Piercing",
+      "honour_demotes_to_dr": false,
+      "source_category": "ring",
+      "notes": "Adds 1d4 Piercing to thrown attacks. DR only."
+    }
+  ]
+}

@@ -16,8 +16,10 @@ from typing import Optional
 from .models import (
     CastingResource,
     ConditionRef,
+    DamageLayerKind,
     DamageType,
     DiceExpression,
+    DRSItem,
     SaveAbility,
     School,
     Spell,
@@ -349,3 +351,152 @@ def parse_spell(page_title: str, wikitext: str) -> tuple[Optional[Spell], list[s
         return spell, errors
     except Exception as exc:
         return None, errors + [f"Model validation failed: {exc}"]
+
+
+# ── Damage_Mechanics page tables (DS / DR / DRS) ──────────────────────────
+
+
+_DICE_FIND_RE = re.compile(r"(\d+)d(\d+)(?:\s*\+\s*(\d+))?")
+
+
+def _row_dice_and_type(cell_text: str) -> tuple[Optional[DiceExpression], Optional[DamageType]]:
+    """Extract the first NdM(+B) dice expression and a damage type from a free-text cell."""
+    dice = None
+    m = _DICE_FIND_RE.search(cell_text)
+    if m:
+        raw = m.group(0).replace(" ", "")
+        dice = DiceExpression.parse(raw)
+    dmg_type: Optional[DamageType] = None
+    for dt in DamageType:
+        if re.search(rf"\b{re.escape(dt.value)}\b", cell_text, re.IGNORECASE):
+            dmg_type = dt
+            break
+    return dice, dmg_type
+
+
+def _split_wikitable_rows(table_body: str) -> list[list[str]]:
+    """Split a single wikitable body into rows of raw cell strings.
+
+    The DRS tables on bg3.wiki/wiki/Damage_Mechanics are pipe-table style:
+
+        {| class="wikitable"
+        |-
+        ! Header A !! Header B !! Header C
+        |-
+        | row1 cell A || row1 cell B || row1 cell C
+        |-
+        | row2 cell A || row2 cell B
+        |  || row2 cell C
+        |}
+
+    We respect both the ``|| `` and ``\n| `` cell separators and drop header
+    rows starting with ``!``.  Cells are returned as raw wiki strings.
+    """
+    rows: list[list[str]] = []
+    current: list[str] | None = None
+    for line in table_body.splitlines():
+        line = line.rstrip()
+        if not line:
+            continue
+        if line.startswith("|-"):
+            if current is not None:
+                rows.append(current)
+            current = []
+            continue
+        if line.startswith("!"):
+            # Header row — skip but still close out an open data row.
+            if current is not None and current:
+                rows.append(current)
+            current = None
+            continue
+        if current is None:
+            current = []
+        if line.startswith("|"):
+            line = line[1:]
+        # Cells inside a single line are separated by ``||``.
+        for cell in line.split("||"):
+            current.append(cell.strip())
+    if current is not None and current:
+        rows.append(current)
+    return rows
+
+
+def _extract_named_wikitables(wikitext: str) -> list[str]:
+    """Return the bodies of every top-level ``{| class="wikitable" ... |}``."""
+    bodies: list[str] = []
+    i = 0
+    while i < len(wikitext):
+        start = wikitext.find("{|", i)
+        if start == -1:
+            break
+        end = wikitext.find("|}", start)
+        if end == -1:
+            break
+        bodies.append(wikitext[start + 2 : end])
+        i = end + 2
+    return bodies
+
+
+def _strip_link_to_name(cell: str) -> str:
+    """Pull a clean display name from a wiki cell (handles ``[[Page|Display]]``)."""
+    cell = cell.strip()
+    # Drop leading icon / file link constructs ``[[File:...]]`` if any.
+    cell = re.sub(r"\[\[File:[^\]]+\]\]", "", cell)
+    # Replace [[Page|Display]] with Display, [[Page]] with Page.
+    cell = re.sub(r"\[\[(?:[^|\]]*\|)?([^\]]+)\]\]", r"\1", cell)
+    cell = re.sub(r"\{\{[^}]*\}\}", "", cell)
+    cell = re.sub(r"<[^>]+>", "", cell)
+    cell = re.sub(r"\s+", " ", cell)
+    return cell.strip()
+
+
+def parse_drs_table(
+    wikitext: str,
+    *,
+    base_url: str = "https://bg3.wiki",
+    layer_kind: DamageLayerKind = DamageLayerKind.DRS,
+    source_category: str = "",
+    honour_demotes_to_dr: bool = True,
+) -> list[DRSItem]:
+    """
+    Parse one or more wikitables containing DRS-classified items.
+
+    Caller supplies:
+      * ``layer_kind`` — the classification this table represents (DS / DR / DRS).
+      * ``source_category`` — free-form provenance label (e.g. ``"weapon"``).
+      * ``honour_demotes_to_dr`` — wiki-documented Honour-mode behaviour.
+
+    Each row's first cell is interpreted as the item name; remaining cells are
+    scanned for the first ``NdM(+B)`` dice expression and a ``DamageType``
+    keyword.  Unparseable rows are skipped (they're typically subheaders or
+    explanatory rows).
+    """
+    items: list[DRSItem] = []
+    seen: set[str] = set()
+    for body in _extract_named_wikitables(wikitext):
+        for row in _split_wikitable_rows(body):
+            if len(row) < 2:
+                continue
+            name = _strip_link_to_name(row[0])
+            if not name or name.lower() in {"name", "item", "weapon", "ability", "tier"}:
+                continue
+            # Concatenate the remaining cells so the dice/type sniffers see everything.
+            tail = " ".join(_strip_link_to_name(c) for c in row[1:])
+            dice, dmg_type = _row_dice_and_type(tail)
+            wiki_url = f"{base_url}/wiki/{name.replace(' ', '_')}"
+            if name in seen:
+                continue
+            seen.add(name)
+            items.append(
+                DRSItem(
+                    name=name,
+                    wiki_url=wiki_url,
+                    layer_kind=layer_kind,
+                    rider_dice=dice,
+                    damage_type=dmg_type,
+                    honour_demotes_to_dr=honour_demotes_to_dr,
+                    source_category=source_category,
+                    notes=tail[:240],
+                )
+            )
+    return items

@@ -71,28 +71,103 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import sys
 from pathlib import Path
+
+try:
+    from .llm_eval import evaluate_provider, load_gold_index
+    from .llm_providers import (
+        DryRunProvider,
+        FormalisationRequest,
+        LLMProvider,
+        auto_select_provider,
+    )
+except ImportError:  # pragma: no cover - flat layout invocation
+    from llm_eval import evaluate_provider, load_gold_index  # type: ignore[no-redef]
+    from llm_providers import (  # type: ignore[no-redef]
+        DryRunProvider,
+        FormalisationRequest,
+        LLMProvider,
+        auto_select_provider,
+    )
+
+
+def _select_provider(name: str) -> LLMProvider:
+    if name == "openai":
+        from .llm_providers import OpenAIProvider  # local import keeps deps lazy
+
+        return OpenAIProvider()
+    if name == "anthropic":
+        from .llm_providers import AnthropicProvider
+
+        return AnthropicProvider()
+    if name == "dry-run":
+        return DryRunProvider()
+    return auto_select_provider()
 
 
 def main(argv: list[str] | None = None) -> int:
     """
-    CLI stub for the closed feedback loop. Production runs wire an LLM here.
+    CLI for the LLM auto-formalisation stage.
 
-    Exits 0 so orchestration can proceed without API keys in CI.
+    Three modes:
+
+    * ``formalize`` — call the configured LLM provider on a single spell.
+    * ``correct``   — re-call the LLM with a counter-example correction
+      hint (currently passes the hint as ``extra_context``).
+    * ``eval``      — run the provider against the entire gold index and
+      print a one-line accuracy summary; optionally write the full report
+      as JSON for ``eval/collect_metrics.py`` to pick up.
+
+    No mode raises if the provider has no API key; instead the active
+    provider falls back to :class:`DryRunProvider` and the call still
+    returns ``0`` so orchestration can continue.
     """
-    p = argparse.ArgumentParser(description="LLM → Lean auto-formalizer (stub or future API).")
+    p = argparse.ArgumentParser(description="LLM → Lean auto-formaliser.")
     p.add_argument("--round", type=int, default=0, help="Feedback-loop round index")
     p.add_argument(
         "--mode",
-        choices=("formalize", "correct"),
-        default="formalize",
-        help="Initial formalization vs correction pass",
+        choices=("formalize", "correct", "eval"),
+        default="eval",
+        help="What to do this invocation",
+    )
+    p.add_argument(
+        "--provider",
+        choices=("auto", "openai", "anthropic", "dry-run"),
+        default="auto",
+        help="Which LLM backend to use; 'auto' picks based on env vars.",
+    )
+    p.add_argument(
+        "--spell",
+        type=str,
+        default=None,
+        help="Spell name (formalize/correct mode).",
+    )
+    p.add_argument(
+        "--wiki-url",
+        type=str,
+        default="",
+        help="Wiki URL for the spell (formalize/correct mode).",
     )
     p.add_argument(
         "--state-json",
         type=Path,
         default=None,
         help="Optional path to read/write loop state hints",
+    )
+    p.add_argument(
+        "--gold-index",
+        type=Path,
+        default=Path(__file__).resolve().parents[2]
+        / "dataset"
+        / "manual_annotations"
+        / "_gold_index.json",
+    )
+    p.add_argument(
+        "--out-json",
+        type=Path,
+        default=None,
+        help="Where to write the eval report (eval mode only).",
     )
     p.add_argument("-v", "--verbose", action="store_true")
     args = p.parse_args(argv)
@@ -102,12 +177,50 @@ def main(argv: list[str] | None = None) -> int:
         format="%(levelname)s %(message)s",
     )
     log = logging.getLogger("llm_to_lean")
-    log.info("round=%s mode=%s (stub: no LLM call)", args.round, args.mode)
-    if args.state_json and args.state_json.exists():
-        log.debug("state keys: %s", list(json.loads(args.state_json.read_text()).keys()))
 
-    return 0
+    provider = _select_provider(args.provider)
+    log.info("provider=%s model=%s mode=%s round=%s", provider.name, provider.model, args.mode, args.round)
+
+    if args.mode == "eval":
+        entries = load_gold_index(args.gold_index)
+        report = evaluate_provider(provider, entries)
+        print(report.summary())
+        if args.out_json:
+            args.out_json.parent.mkdir(parents=True, exist_ok=True)
+            args.out_json.write_text(
+                json.dumps(report.to_dict(), indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            log.info("wrote %s", args.out_json)
+        return 0
+
+    if args.mode in {"formalize", "correct"}:
+        if not args.spell:
+            print("error: --spell is required for formalize/correct mode", file=sys.stderr)
+            return 2
+        extra = ""
+        if args.state_json and args.state_json.exists():
+            extra = args.state_json.read_text(encoding="utf-8")
+        request = FormalisationRequest(
+            spell_name=args.spell,
+            wiki_url=args.wiki_url,
+            extra_context=extra,
+        )
+        response = provider.formalise(request)
+        if response.error:
+            log.warning("provider error: %s", response.error)
+        print(json.dumps({
+            "provider": response.provider,
+            "model": response.model,
+            "spell": args.spell,
+            "raw_text": response.raw_text,
+            "parsed_facts": dict(response.parsed_facts),
+            "error": response.error,
+        }, indent=2, ensure_ascii=False))
+        return 0
+
+    return 0  # unreachable
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover - module-as-script
     raise SystemExit(main())

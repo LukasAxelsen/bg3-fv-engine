@@ -50,9 +50,12 @@ lean_lib VALOR where
   srcDir := "."
   roots := #[
     `Core.Types, `Core.Engine,
-    `Axioms.BG3Rules,
+    `Axioms.BG3Rules, `Axioms.DRSItems,
     `Proofs.Exploits, `Proofs.Termination,
-    `Scenarios.P14_AdvantageAlgebra
+    `Scenarios.P14_AdvantageAlgebra,
+    `Scenarios.P17_DualWieldCrossover,
+    `Scenarios.P22_ActionSurgeExplosion,
+    `Scenarios.P29_CoffeelockInfiniteSlots
   ]
 
 /-- Optional library: draft scenarios pending Lean 4.29 upgrade.

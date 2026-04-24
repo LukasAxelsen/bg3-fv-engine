@@ -29,8 +29,13 @@ from engine_bridge.log_analyzer import (
     analyze_log,
 )
 from engine_bridge.lua_generator import (
+    BRIDGE_SCHEMA_VERSION,
+    DEFAULT_STATUS_TRANSLATION,
     _entity_uuid,
     _slug,
+    _slim_predicted_state,
+    _to_lua,
+    _worst_case_damage,
     compile_to_lua,
 )
 
@@ -140,13 +145,86 @@ class TestEntityUuid:
         assert uuid.endswith("000000000099")
 
 
+class TestWorstCaseDamage:
+    def test_single_roll(self) -> None:
+        assert _worst_case_damage([{"dice": {"count": 8, "sides": 6, "bonus": 0}}]) == 48
+
+    def test_multi_roll(self) -> None:
+        rolls = [
+            {"dice": {"count": 1, "sides": 8, "bonus": 5}},
+            {"dice": {"count": 2, "sides": 6, "bonus": 0}},
+        ]
+        assert _worst_case_damage(rolls) == 13 + 12
+
+    def test_malformed_skipped(self) -> None:
+        assert _worst_case_damage([{"dice": "broken"}, "not a dict"]) == 0
+
+
+class TestSlimPredictedState:
+    def test_extracts_lean_id_and_sorts_tags(self) -> None:
+        slim = _slim_predicted_state(
+            {
+                "entities": [
+                    {
+                        "id": {"val": 0},
+                        "hp": 42,
+                        "concentratingOn": "Hex",
+                        "conditions": [{"tag": "haste"}, {"tag": "blessed"}],
+                    }
+                ]
+            }
+        )
+        assert slim == {
+            "entities": [
+                {
+                    "id": 0,
+                    "hp": 42,
+                    "concentratingOn": "Hex",
+                    "conditionTags": ["blessed", "haste"],
+                }
+            ]
+        }
+
+    def test_int_id_accepted(self) -> None:
+        slim = _slim_predicted_state({"entities": [{"id": 7, "hp": 1, "conditions": []}]})
+        assert slim["entities"][0]["id"] == 7
+
+
+class TestToLua:
+    def test_primitives(self) -> None:
+        assert _to_lua(None) == "nil"
+        assert _to_lua(True) == "true"
+        assert _to_lua(False) == "false"
+        assert _to_lua(3) == "3"
+        assert _to_lua("ab\"c") == '"ab\\"c"'
+
+    def test_list(self) -> None:
+        assert _to_lua([1, "x"]).startswith("{") and "1" in _to_lua([1, "x"])
+
+    def test_dict_with_int_keys(self) -> None:
+        out = _to_lua({0: "a", 1: "b"})
+        assert "[0]" in out and "[1]" in out
+
+    def test_dict_with_string_keys(self) -> None:
+        out = _to_lua({"k": "v"})
+        assert '["k"]' in out and '"v"' in out
+
+
 class TestCompileToLua:
+    def _read(self, p: Path) -> str:
+        return p.read_text(encoding="utf-8")
+
     def test_produces_lua_file(self, tmp_path: Path) -> None:
         path = CounterexamplePath(
             steps=[
                 CounterexampleStep(
                     state={"entities": [{"id": {"val": 0}, "hp": 50, "conditions": []}]},
-                    event={"tag": "castSpell", "caster": 0, "spellName": "Fireball", "target": {"tag": "single", "target": 1}},
+                    event={
+                        "tag": "castSpell",
+                        "caster": 0,
+                        "spellName": "Fireball",
+                        "target": {"tag": "single", "target": 1},
+                    },
                 ),
             ],
             axiom_name="fireball_damage",
@@ -154,9 +232,20 @@ class TestCompileToLua:
         out = compile_to_lua(path, tmp_path)
         assert out.suffix == ".lua"
         assert out.exists()
-        content = out.read_text()
-        assert "Osi.UseSpell" in content
+        content = self._read(out)
+        # Spell uid baked into the action table.
         assert "Projectile_Fireball" in content
+        # Schema declared.
+        assert f"Schema version: {BRIDGE_SCHEMA_VERSION}" in content
+        # Returns a script_data table for VALOR.Execute dispatch.
+        assert "return {" in content
+        assert '["actions"]' in content
+        assert '["entity_id_map"]' in content
+        # Uses real sandbox exports only.
+        assert "VALOR.Sandbox.Setup" in content
+        assert "Sandbox.ResetForValorTest" not in content
+        assert "Sandbox.InitTestEnvironment" not in content
+        assert "Sandbox.ApplyDamageRolls" not in content
 
     def test_weapon_attack_event(self, tmp_path: Path) -> None:
         path = CounterexamplePath(
@@ -168,11 +257,32 @@ class TestCompileToLua:
             ],
             axiom_name="melee_test",
         )
-        out = compile_to_lua(path, tmp_path)
-        content = out.read_text()
-        assert "Osi.Attack" in content
+        content = self._read(compile_to_lua(path, tmp_path))
+        # Action type for weapon attacks is "attack" (consumed by execute.RunAction).
+        assert '["type"] = "attack"' in content
+        assert "[0]" in content and "[1]" in content  # entity_id_map covers both
 
-    def test_unsupported_event(self, tmp_path: Path) -> None:
+    def test_take_damage_emits_apply_damage_with_worst_case(self, tmp_path: Path) -> None:
+        path = CounterexamplePath(
+            steps=[
+                CounterexampleStep(
+                    state={"entities": []},
+                    event={
+                        "tag": "takeDamage",
+                        "target": 1,
+                        "rolls": [
+                            {"dice": {"count": 8, "sides": 6, "bonus": 0}, "dmgType": "fire"}
+                        ],
+                    },
+                )
+            ],
+            axiom_name="fireball_max",
+        )
+        content = self._read(compile_to_lua(path, tmp_path))
+        assert '["type"] = "apply_damage"' in content
+        assert '["amount"] = 48' in content
+
+    def test_unsupported_event_becomes_noop(self, tmp_path: Path) -> None:
         path = CounterexamplePath(
             steps=[
                 CounterexampleStep(
@@ -182,9 +292,25 @@ class TestCompileToLua:
             ],
             axiom_name="edge",
         )
-        out = compile_to_lua(path, tmp_path)
-        content = out.read_text()
+        content = self._read(compile_to_lua(path, tmp_path))
+        assert '["type"] = "noop"' in content
         assert "Unsupported event" in content
+
+    def test_status_translation_baked_in(self, tmp_path: Path) -> None:
+        path = CounterexamplePath(
+            steps=[
+                CounterexampleStep(
+                    state={"entities": []},
+                    event={"tag": "weaponAttack", "attacker": 0, "target": 1},
+                )
+            ],
+            axiom_name="t",
+        )
+        content = self._read(compile_to_lua(path, tmp_path))
+        assert "status_translation" in content
+        # Sample mapping from the default table is present.
+        first_engine_id = next(iter(DEFAULT_STATUS_TRANSLATION.keys()))
+        assert first_engine_id in content
 
 
 # ── log_analyzer ─────────────────────────────────────────────────────────────

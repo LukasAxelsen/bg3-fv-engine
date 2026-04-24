@@ -1,0 +1,310 @@
+{
+  "_provenance": {
+    "purpose": "Indexed gold set used by `src/1_auto_formalizer/llm_eval.py` to score auto-formalisation accuracy. Each entry pins the *facts* an LLM should extract from a wiki page (dice, save, AoE, etc.). Per-entry per-fact accuracy is the metric used in eval/collect_metrics.py.",
+    "complexity_levels": {
+      "simple": "single damage roll, no rider, no upcast formula",
+      "compound": "rider + multiple damage components OR documented bug",
+      "complex": "concentration interactions, conditions with multi-turn duration, or upcast scaling formula"
+    },
+    "extraction_date": "2026-04-25",
+    "schema_version": 1
+  },
+  "entries": [
+    {
+      "id": "fireball",
+      "spell_name": "Fireball",
+      "wiki_url": "https://bg3.wiki/wiki/Fireball",
+      "complexity": "compound",
+      "gold_facts": {
+        "spell_slot_level": 3,
+        "school": "Evocation",
+        "damage_dice": "8d6",
+        "damage_type": "Fire",
+        "save_ability": "Dexterity",
+        "on_save": "half",
+        "range_m": 18.0,
+        "aoe_m": 4.0,
+        "concentration": false,
+        "ritual": false
+      }
+    },
+    {
+      "id": "hex",
+      "spell_name": "Hex",
+      "wiki_url": "https://bg3.wiki/wiki/Hex",
+      "complexity": "complex",
+      "gold_facts": {
+        "spell_slot_level": 1,
+        "school": "Enchantment",
+        "damage_dice": "1d6",
+        "damage_type": "Necrotic",
+        "concentration": true,
+        "casting_resource": "Bonus Action"
+      }
+    },
+    {
+      "id": "counterspell",
+      "spell_name": "Counterspell",
+      "wiki_url": "https://bg3.wiki/wiki/Counterspell",
+      "complexity": "complex",
+      "gold_facts": {
+        "spell_slot_level": 3,
+        "school": "Abjuration",
+        "casting_resource": "Reaction"
+      }
+    },
+    {
+      "id": "magic_missile",
+      "spell_name": "Magic Missile",
+      "wiki_url": "https://bg3.wiki/wiki/Magic_Missile",
+      "complexity": "compound",
+      "gold_facts": {
+        "spell_slot_level": 1,
+        "school": "Evocation",
+        "damage_dice": "1d4",
+        "damage_type": "Force",
+        "requires_attack_roll": false,
+        "range_m": 18.0
+      }
+    },
+    {
+      "id": "cure_wounds",
+      "spell_name": "Cure Wounds",
+      "wiki_url": "https://bg3.wiki/wiki/Cure_Wounds",
+      "complexity": "simple",
+      "gold_facts": {
+        "spell_slot_level": 1,
+        "school": "Evocation",
+        "damage_dice": "1d8",
+        "damage_type": null,
+        "requires_attack_roll": false,
+        "range_m": 1.5
+      }
+    },
+    {
+      "id": "eldritch_blast",
+      "spell_name": "Eldritch Blast",
+      "wiki_url": "https://bg3.wiki/wiki/Eldritch_Blast",
+      "complexity": "compound",
+      "gold_facts": {
+        "spell_slot_level": null,
+        "school": "Evocation",
+        "damage_dice": "1d10",
+        "damage_type": "Force",
+        "requires_attack_roll": true,
+        "range_m": 18.0
+      }
+    },
+    {
+      "id": "healing_word",
+      "spell_name": "Healing Word",
+      "wiki_url": "https://bg3.wiki/wiki/Healing_Word",
+      "complexity": "simple",
+      "gold_facts": {
+        "spell_slot_level": 1,
+        "school": "Evocation",
+        "damage_dice": "1d4",
+        "damage_type": null,
+        "casting_resource": "Bonus Action",
+        "range_m": 18.0
+      }
+    },
+    {
+      "id": "sacred_flame",
+      "spell_name": "Sacred Flame",
+      "wiki_url": "https://bg3.wiki/wiki/Sacred_Flame",
+      "complexity": "simple",
+      "gold_facts": {
+        "spell_slot_level": null,
+        "school": "Evocation",
+        "damage_dice": "1d8",
+        "damage_type": "Radiant",
+        "save_ability": "Dexterity",
+        "on_save": "negate",
+        "range_m": 18.0
+      }
+    },
+    {
+      "id": "vicious_mockery",
+      "spell_name": "Vicious Mockery",
+      "wiki_url": "https://bg3.wiki/wiki/Vicious_Mockery",
+      "complexity": "compound",
+      "gold_facts": {
+        "spell_slot_level": null,
+        "school": "Enchantment",
+        "damage_dice": "1d4",
+        "damage_type": "Psychic",
+        "save_ability": "Wisdom",
+        "on_save": "negate"
+      }
+    },
+    {
+      "id": "bless",
+      "spell_name": "Bless",
+      "wiki_url": "https://bg3.wiki/wiki/Bless",
+      "complexity": "complex",
+      "gold_facts": {
+        "spell_slot_level": 1,
+        "school": "Enchantment",
+        "concentration": true
+      }
+    },
+    {
+      "id": "bane",
+      "spell_name": "Bane",
+      "wiki_url": "https://bg3.wiki/wiki/Bane",
+      "complexity": "complex",
+      "gold_facts": {
+        "spell_slot_level": 1,
+        "school": "Enchantment",
+        "save_ability": "Charisma",
+        "on_save": "negate",
+        "concentration": true
+      }
+    },
+    {
+      "id": "misty_step",
+      "spell_name": "Misty Step",
+      "wiki_url": "https://bg3.wiki/wiki/Misty_Step",
+      "complexity": "simple",
+      "gold_facts": {
+        "spell_slot_level": 2,
+        "school": "Conjuration",
+        "casting_resource": "Bonus Action",
+        "range_m": 18.0
+      }
+    },
+    {
+      "id": "shield",
+      "spell_name": "Shield",
+      "wiki_url": "https://bg3.wiki/wiki/Shield",
+      "complexity": "complex",
+      "gold_facts": {
+        "spell_slot_level": 1,
+        "school": "Abjuration",
+        "casting_resource": "Reaction"
+      }
+    },
+    {
+      "id": "sleep",
+      "spell_name": "Sleep",
+      "wiki_url": "https://bg3.wiki/wiki/Sleep",
+      "complexity": "compound",
+      "gold_facts": {
+        "spell_slot_level": 1,
+        "school": "Enchantment",
+        "damage_dice": "5d8",
+        "range_m": 18.0,
+        "aoe_m": 6.0
+      }
+    },
+    {
+      "id": "burning_hands",
+      "spell_name": "Burning Hands",
+      "wiki_url": "https://bg3.wiki/wiki/Burning_Hands",
+      "complexity": "compound",
+      "gold_facts": {
+        "spell_slot_level": 1,
+        "school": "Evocation",
+        "damage_dice": "3d6",
+        "damage_type": "Fire",
+        "save_ability": "Dexterity",
+        "on_save": "half",
+        "aoe_m": 5.0
+      }
+    },
+    {
+      "id": "thunderwave",
+      "spell_name": "Thunderwave",
+      "wiki_url": "https://bg3.wiki/wiki/Thunderwave",
+      "complexity": "compound",
+      "gold_facts": {
+        "spell_slot_level": 1,
+        "school": "Evocation",
+        "damage_dice": "2d8",
+        "damage_type": "Thunder",
+        "save_ability": "Constitution",
+        "on_save": "half",
+        "aoe_m": 5.0
+      }
+    },
+    {
+      "id": "hold_person",
+      "spell_name": "Hold Person",
+      "wiki_url": "https://bg3.wiki/wiki/Hold_Person",
+      "complexity": "complex",
+      "gold_facts": {
+        "spell_slot_level": 2,
+        "school": "Enchantment",
+        "save_ability": "Wisdom",
+        "on_save": "negate",
+        "concentration": true,
+        "range_m": 18.0
+      }
+    },
+    {
+      "id": "mage_armor",
+      "spell_name": "Mage Armor",
+      "wiki_url": "https://bg3.wiki/wiki/Mage_Armor",
+      "complexity": "simple",
+      "gold_facts": {
+        "spell_slot_level": 1,
+        "school": "Abjuration",
+        "concentration": false
+      }
+    },
+    {
+      "id": "spiritual_weapon",
+      "spell_name": "Spiritual Weapon",
+      "wiki_url": "https://bg3.wiki/wiki/Spiritual_Weapon",
+      "complexity": "compound",
+      "gold_facts": {
+        "spell_slot_level": 2,
+        "school": "Evocation",
+        "damage_dice": "1d8",
+        "damage_type": "Force",
+        "casting_resource": "Bonus Action",
+        "concentration": false
+      }
+    },
+    {
+      "id": "scorching_ray",
+      "spell_name": "Scorching Ray",
+      "wiki_url": "https://bg3.wiki/wiki/Scorching_Ray",
+      "complexity": "compound",
+      "gold_facts": {
+        "spell_slot_level": 2,
+        "school": "Evocation",
+        "damage_dice": "2d6",
+        "damage_type": "Fire",
+        "requires_attack_roll": true,
+        "range_m": 18.0
+      }
+    },
+    {
+      "id": "haste",
+      "spell_name": "Haste",
+      "wiki_url": "https://bg3.wiki/wiki/Haste",
+      "complexity": "complex",
+      "gold_facts": {
+        "spell_slot_level": 3,
+        "school": "Transmutation",
+        "concentration": true,
+        "range_m": 9.0
+      }
+    },
+    {
+      "id": "chromatic_orb",
+      "spell_name": "Chromatic Orb",
+      "wiki_url": "https://bg3.wiki/wiki/Chromatic_Orb",
+      "complexity": "compound",
+      "gold_facts": {
+        "spell_slot_level": 1,
+        "school": "Evocation",
+        "damage_dice": "3d8",
+        "requires_attack_roll": true,
+        "range_m": 18.0
+      }
+    }
+  ]
+}

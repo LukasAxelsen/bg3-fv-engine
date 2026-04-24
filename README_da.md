@@ -8,9 +8,12 @@
 
 [English](README.md) | [中文](README_zh.md) | [Dansk](README_da.md)
 
-> Denne danske udgave er synkroniseret med [den engelske README](README.md) op til `v0.1-alpha`.
-> Projektpolitik: den engelske udgave er den primære; den kinesiske og danske
-> udgave opdateres kun ved eksplicit anmodning.
+> ⚠️ **Denne danske udgave svarer til `v0.1-alpha` (arkiveret).**
+> Den nuværende `v0.2-alpha` introducerer et DRS-emnekatalog, tre nye
+> verificerede scenarier (P17 / P22 / P29), den lukkede Lean ↔ Lua-bro,
+> et eksplicit skades-semantikvalg samt en reel LLM-evalueringsramme.
+> Konsultér [den engelske README](README.md) for det aktuelle indhold;
+> den danske og kinesiske oversættelse opdateres kun ved eksplicit anmodning.
 
 En neuro-symbolsk lukket-løkke-ramme til formel verifikation af kampmekanikker i computerspil, instantieret på Baldur's Gate 3.  `v0.1-alpha` leverer:
 

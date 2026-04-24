@@ -29,13 +29,63 @@ def applyDamageRelation (base : Int) (rel : DamageRelation) : Int :=
   | .resistant  => base / 2
   | .immune     => 0
 
-/-- Apply a list of damage rolls to an entity, respecting resistances. -/
-def Entity.applyDamage (e : Entity) (rolls : List DamageRoll) : Entity :=
+/-- Choice of which dice statistic to use when collapsing a `DiceExpr`
+    into a single integer.  Different research questions need different
+    semantics:
+
+    * `worstCase`  — `count·sides + bonus`.  Used by exploit-search
+      proofs (P1, P10, etc.) where we want a sound *upper bound* on
+      damage.  Conclusions of the form "even in the worst case the
+      build deals ≤ K damage" are sound under this semantics.
+    * `expected2` — `count·(sides+1) + 2·bonus`.  This is twice the
+      true expected value (`count·(sides+1)/2 + bonus`), kept in `Int`
+      to avoid rationals.  Used by *average DPR* arguments (P17).
+    * `minCase`   — `count + bonus`.  All dice roll 1.  Useful as a
+      sanity bound (no build can do less than this on a hit).
+
+    Earlier drafts of this file silently used `worstCase` and called the
+    result the "damage" — which made average-DPR scenarios subtly
+    unsound.  Making the semantics explicit removes that ambiguity. -/
+inductive DamageSemantics where
+  | worstCase
+  | expected2
+  | minCase
+  deriving DecidableEq, Repr
+
+namespace DamageSemantics
+
+def fold (s : DamageSemantics) (d : DiceExpr) : Int :=
+  match s with
+  | worstCase => d.count * d.sides + d.bonus
+  | expected2 => d.count * (d.sides + 1) + 2 * d.bonus
+  | minCase   => d.count + d.bonus
+
+theorem min_le_worst (d : DiceExpr) (h₁ : 1 ≤ d.sides) :
+    fold .minCase d ≤ fold .worstCase d := by
+  simp [fold]
+  -- d.count + d.bonus ≤ d.count * d.sides + d.bonus
+  -- ⇔ d.count ≤ d.count * d.sides, true since sides ≥ 1.
+  have : d.count ≤ d.count * d.sides := Nat.le_mul_of_pos_right d.count h₁
+  omega
+
+end DamageSemantics
+
+/-- Apply a list of damage rolls to an entity using the specified
+    `DamageSemantics`, respecting resistances.  When no semantics is
+    given, defaults to `worstCase` for backwards compatibility with
+    upper-bound exploit search. -/
+def Entity.applyDamageWith (e : Entity) (sem : DamageSemantics)
+    (rolls : List DamageRoll) : Entity :=
   let totalDmg := rolls.foldl (fun acc r =>
-    let maxDmg := r.dice.maxVal  -- worst-case for verification
-    acc + applyDamageRelation maxDmg (e.resistance r.dmgType)
+    let raw := sem.fold r.dice
+    acc + applyDamageRelation raw (e.resistance r.dmgType)
   ) (0 : Int)
   { e with hp := e.hp - totalDmg }
+
+/-- Backwards-compatible alias: defaults to `worstCase` (the original
+    semantics).  Existing call sites need no change. -/
+def Entity.applyDamage (e : Entity) (rolls : List DamageRoll) : Entity :=
+  e.applyDamageWith .worstCase rolls
 
 -- ── Concentration check ─────────────────────────────────────────────────
 

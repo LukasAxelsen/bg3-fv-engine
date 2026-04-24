@@ -75,6 +75,24 @@ class TickType(str, enum.Enum):
     END_ROUND = "EndRound"
 
 
+class DamageLayerKind(str, enum.Enum):
+    """Three-tier classification used by bg3.wiki/wiki/Damage_Mechanics.
+
+    * ``DS``  — Damage Source: a direct damage event (weapon attack, spell hit,
+      thrown item) that can deal damage on its own.
+    * ``DR``  — Damage Rider: bonus damage that "rides along" a Source; cannot
+      deal damage independently.
+    * ``DRS`` — Damage Rider treated as a Source: a rider that, when it fires,
+      is itself classified as a Source and therefore re-attracts every
+      eligible Rider for a second pass.  This is the root cause of the
+      thousand-damage Honour-mode-disabled exploits.
+    """
+
+    DS = "DS"
+    DR = "DR"
+    DRS = "DRS"
+
+
 # ── Dice Expression ───────────────────────────────────────────────────────
 
 _DICE_RE = re.compile(
@@ -227,6 +245,52 @@ class PassiveFeature(BaseModel):
     raw_wikitext: str = ""
 
 
+# ── Core Entity: Damage-Layer Item (DS / DR / DRS classification) ────────
+
+class DRSItem(BaseModel):
+    """
+    A single entry from bg3.wiki's *Damage Mechanics → DRS effects* tables.
+
+    The model is shared between the data layer (parser / SQLite) and the
+    proof layer: ``Axioms/DRSItems.lean`` is generated from a
+    serialisation of these records, so any change in this schema must be
+    reflected in both ends and is checked for drift by the test suite.
+    """
+
+    name: str = Field(description="Display name of the item or ability.")
+    wiki_url: str = Field(description="Canonical bg3.wiki URL for provenance.")
+    layer_kind: DamageLayerKind = Field(
+        description="DS, DR or DRS classification per the wiki."
+    )
+    rider_dice: Optional[DiceExpression] = Field(
+        default=None,
+        description="Dice expression for the rider damage (where applicable).",
+    )
+    damage_type: Optional[DamageType] = Field(
+        default=None,
+        description="Damage type emitted by this layer.",
+    )
+    honour_demotes_to_dr: bool = Field(
+        default=False,
+        description=(
+            "True iff the wiki documents that this DRS effect is treated as a "
+            "plain DR in Honour mode (the documented Patch 5 behaviour)."
+        ),
+    )
+    source_category: str = Field(
+        default="",
+        description="Free-form provenance: 'weapon', 'item', 'class feature', 'spell', etc.",
+    )
+    notes: str = Field(default="", description="Verbatim wiki note column.")
+
+    @field_validator("name")
+    @classmethod
+    def _name_not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("DRSItem name must not be empty")
+        return v.strip()
+
+
 # ── Database Envelope ─────────────────────────────────────────────────────
 
 class CrawlRecord(BaseModel):
@@ -235,8 +299,8 @@ class CrawlRecord(BaseModel):
     page_title: str
     page_id: int
     wiki_url: str
-    entity_type: str = Field(description="'spell', 'condition', 'passive'")
+    entity_type: str = Field(description="'spell', 'condition', 'passive', 'drs_item'")
     raw_wikitext: str
-    parsed: Optional[Spell | Condition | PassiveFeature] = None
+    parsed: Optional[Spell | Condition | PassiveFeature | DRSItem] = None
     crawled_at: str = ""
     parse_errors: list[str] = Field(default_factory=list)
